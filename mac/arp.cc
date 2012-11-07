@@ -58,6 +58,8 @@
 #include "packet.h"
 #include <address.h>
 
+#define RADIOS 3
+
 // #define DEBUG
 
 static class ARPTableClass : public TclClass {
@@ -122,6 +124,23 @@ int
 ARPTable::arpresolve(nsaddr_t dst, Packet *p, LL *ll)
 {
         ARPEntry *llinfo ;
+
+	
+	// CRAHNs Model START
+	// @author:  Marco Di Felice	
+	
+	// Deactivate the ARP traffic, perform manually address resolution
+	struct hdr_cmn *ch = HDR_CMN(p);
+	
+	if (ch->ptype() == PT_AODV) 
+		mac_->hdr_dst((char*) HDR_MAC(p), dst*RADIOS + 0);
+	else {
+		mac_->hdr_dst((char*) HDR_MAC(p), dst*RADIOS + 2);
+	}
+
+        return 0;
+	// CRAHNs Model END
+
 	
 	assert(initialized());
 	llinfo = arplookup(dst);

@@ -122,5 +122,30 @@ public:
 	void	handle(Event *e);
 };
 
+
+
+// CRAHNs Model START
+// @author:  Marco Di Felice
+
+// Timer for queue switching
+class SwitchQueueTimer : public MacTimer {
+public:
+	SwitchQueueTimer(Mac802_11 *m) : MacTimer(m) {}
+
+	void	handle(Event *e);
+};
+
+
+// Timer for channel switching
+class SwitchChannelTimer : public MacTimer {
+public:
+	SwitchChannelTimer(Mac802_11 *m) : MacTimer(m) {}
+
+	void	handle(Event *e);
+};
+
+// CRAHNs Model END
+
+
 #endif /* __mac_timers_h__ */
 

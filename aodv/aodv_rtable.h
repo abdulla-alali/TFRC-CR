@@ -43,6 +43,7 @@ The AODV code developed by the CMU/MONARCH group was optimized and tuned by Sami
 /*
    AODV Neighbor Cache Entry
 */
+
 class AODV_Neighbor {
         friend class AODV;
         friend class aodv_rt_entry;
@@ -53,6 +54,14 @@ class AODV_Neighbor {
         LIST_ENTRY(AODV_Neighbor) nb_link;
         nsaddr_t        nb_addr;
         double          nb_expire;      // ALLOWED_HELLO_LOSS * HELLO_INTERVAL
+		
+	// CRAHNs Model START
+	// @author:  Marco Di Felice
+	
+	u_int8_t	channel;
+	int		hop;
+	// CRAHNs Model END
+
 };
 
 LIST_HEAD(aodv_ncache, AODV_Neighbor);

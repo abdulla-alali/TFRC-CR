@@ -129,6 +129,31 @@ AODV::command(int argc, const char*const* argv) {
 	}
 	return TCL_OK;
     }
+    
+
+    // CRAHNs Model START
+    // @author:  Marco Di Felice
+  
+    else if (strcasecmp (argv[1], "down-target-1") == 0) {
+	downtarget_[0] = (NsObject *) TclObject::lookup(argv[2]);
+     	return TCL_OK;
+    }
+    else if (strcasecmp (argv[1], "down-target-2") == 0) {
+	downtarget_[1] = (NsObject *) TclObject::lookup(argv[2]);
+     	return TCL_OK;
+    }
+    else if (strcasecmp (argv[1], "down-target-3") == 0) {
+	downtarget_[2] = (NsObject *) TclObject::lookup(argv[2]);
+     	return TCL_OK;
+    }
+   
+    else if (strcmp(argv[1], "setRepository") == 0) {
+	repository_ = (Repository*) TclObject::lookup(argv[2]);
+        return (TCL_OK);
+    }
+  
+  // CRAHNs Model END
+
   }
   return Agent::command(argc, argv);
 }
@@ -151,7 +176,26 @@ AODV::AODV(nsaddr_t id) : Agent(PT_AODV),
 
   logtarget = 0;
   ifqueue = 0;
+	
+
+ // CRAHNs Model START
+ // @author:  Marco Di Felice
+ 
+  // Initialize the number of interferers for channel ...
+  for (int i=0; i<MAX_CHANNELS; i++)
+	  num_recv_channels_[i]=0;
+  
+  htimer.handle(NULL);
+
+  // Initialize your channel allocation policy here ...
+  channel_allocation_mode_=MIN_INTERFERENCE_POLICY;
+ 
+  num_packets_sent_=0;  
+
+  // CRAHNs Model END
+ 
 }
+
 
 /*
   Timers
@@ -163,14 +207,41 @@ BroadcastTimer::handle(Event*) {
   Scheduler::instance().schedule(this, &intr, BCAST_ID_SAVE);
 }
 
+
+
+// CRAHNs Model START
+// @author:  Marco Di Felice
+
+// Handle Timer expire events
 void
 HelloTimer::handle(Event*) {
-   agent->sendHello();
-   double interval = MinHelloInterval + 
-                 ((MaxHelloInterval - MinHelloInterval) * Random::uniform());
+
+
+     if (CURRENT_TIME < 0.5)  {
+		 Scheduler::instance().schedule(this, &intr, 0.5 + Random::uniform()*0.5);
+		return;
+   }
+
+   // Channel Allocation: the fixed receiving channel is decided
+   agent->set_receiver_channel();
+   // HELLO message is broadcasted every HELLO_REFRESH_TIMER seconds
+   #ifdef HELLO_MSG_OPTIMIZATION
+   if (agent->num_packets_sent_ > PACKET_ACTIVE_THRESHOLD )
+	   agent->sendHello();
+   #else
+	   agent->sendHello();
+   #endif
+	
+   agent->num_packets_sent_=0;
+
+   double interval= (Random::uniform() * 0.5 + HELLO_REFRESH_TIMER);
    assert(interval >= 0);
    Scheduler::instance().schedule(this, &intr, interval);
 }
+
+// CRAHNs Model END
+ 
+
 
 void
 NeighborTimer::handle(Event*) {
@@ -287,7 +358,7 @@ double total_latency = 0.0;
 
 static void
 aodv_rt_failed_callback(Packet *p, void *arg) {
-  ((AODV*) arg)->rt_ll_failed(p);
+//  ((AODV*) arg)->rt_ll_failed(p);
 }
 
 /*
@@ -569,8 +640,18 @@ struct hdr_ip *ih = HDR_IP(p);
    recvAODV(p);
    return;
  }
-
-
+ 
+ // CRAHNs Model START
+ // @author:  Marco Di Felice
+ 
+ if(ch->ptype() == PT_NOTIFICATION) {
+	recvNotification(p);
+	return;
+ }
+ 
+ // CRAHNs Model END
+ // @author:  Marco Di Felice
+ 
  /*
   *  Must be a packet I'm originating...
   */
@@ -1036,16 +1117,50 @@ if (ih->daddr() == (nsaddr_t) IP_BROADCAST) {
    /*
     *  Jitter the sending of broadcast packets by 10ms
     */
-   Scheduler::instance().schedule(target_, p,
+   Scheduler::instance().schedule(downtarget_[CONTROL_RADIO], p,
       				   0.01 * Random::uniform());
  }
  else { // Not a broadcast packet 
    if(delay > 0.0) {
-     Scheduler::instance().schedule(target_, p, delay);
+     if (ch->ptype() == PT_AODV) {
+	   ch->channel_=CONTROL_CHANNEL;	   
+	   // Broadcast messages are sent on the CONTROL_RADIO
+  	   Scheduler::instance().schedule(downtarget_[CONTROL_RADIO], p, delay);
+     } else {
+		
+           num_packets_sent_++;
+	   ch->channel_=repository_->get_recv_channel(rt->rt_nexthop);
+		
+           repository_->update_send_channel(index, ch->channel_,CURRENT_TIME);
+
+ 	   // Default case: use the TRANSMITTER interface 
+ 	   Scheduler::instance().schedule(downtarget_[TRANSMITTER_RADIO], p, delay);
+
+     }
+
    }
    else {
    // Not a broadcast packet, no delay, send immediately
-     Scheduler::instance().schedule(target_, p, 0.);
+     if (ch->ptype() == PT_AODV) {
+	   ch->channel_=CONTROL_CHANNEL;
+
+  	   // Broadcast messages are sent on the CONTROL_RADIO
+	   Scheduler::instance().schedule(downtarget_[CONTROL_RADIO], p, 0.);
+     }
+     else  {
+          	
+
+ 	   ch->channel_=repository_->get_recv_channel(rt->rt_nexthop);
+	   
+	   repository_->update_send_channel(index, ch->channel_,CURRENT_TIME);
+
+
+  	   num_packets_sent_++;
+	 
+          // Default case: use the TRANSMITTER interface 
+ 	  Scheduler::instance().schedule(downtarget_[TRANSMITTER_RADIO], p, 0.);
+
+     }
    }
  }
 
@@ -1153,6 +1268,7 @@ aodv_rt_entry *rt = rtable.rt_lookup(dst);
  ch->error() = 0;
  ch->addr_type() = NS_AF_NONE;
  ch->prev_hop_ = index;          // AODV hack
+ ch->channel_ = CONTROL_CHANNEL;
 
  ih->saddr() = index;
  ih->daddr() = IP_BROADCAST;
@@ -1171,7 +1287,7 @@ aodv_rt_entry *rt = rtable.rt_lookup(dst);
  rq->rq_src_seqno = seqno;
  rq->rq_timestamp = CURRENT_TIME;
 
- Scheduler::instance().schedule(target_, p, 0.);
+ Scheduler::instance().schedule(downtarget_[CONTROL_RADIO], p, 0.);
 
 }
 
@@ -1207,6 +1323,8 @@ fprintf(stderr, "sending Reply from %d at %.2f\n", index, Scheduler::instance().
  ch->next_hop_ = rt->rt_nexthop;
  ch->prev_hop_ = index;          // AODV hack
  ch->direction() = hdr_cmn::DOWN;
+ ch->channel_ = CONTROL_CHANNEL;
+
 
  ih->saddr() = index;
  ih->daddr() = ipdst;
@@ -1214,7 +1332,7 @@ fprintf(stderr, "sending Reply from %d at %.2f\n", index, Scheduler::instance().
  ih->dport() = RT_PORT;
  ih->ttl_ = NETWORK_DIAMETER;
 
- Scheduler::instance().schedule(target_, p, 0.);
+ Scheduler::instance().schedule(downtarget_[CONTROL_RADIO], p, 0.);
 
 }
 
@@ -1250,9 +1368,9 @@ fprintf(stderr, "sending Error from %d at %.2f\n", index, Scheduler::instance().
 
  // Do we need any jitter? Yes
  if (jitter)
- 	Scheduler::instance().schedule(target_, p, 0.01*Random::uniform());
+ 	Scheduler::instance().schedule(downtarget_[CONTROL_RADIO], p, 0.01*Random::uniform());
  else
- 	Scheduler::instance().schedule(target_, p, 0.0);
+ 	Scheduler::instance().schedule(downtarget_[CONTROL_RADIO], p, 0.0);
 
 }
 
@@ -1266,20 +1384,47 @@ AODV::sendHello() {
 Packet *p = Packet::alloc();
 struct hdr_cmn *ch = HDR_CMN(p);
 struct hdr_ip *ih = HDR_IP(p);
-struct hdr_aodv_reply *rh = HDR_AODV_REPLY(p);
+struct hdr_aodv_hello *rh = HDR_AODV_HELLO(p);
 
 #ifdef DEBUG
 fprintf(stderr, "sending Hello from %d at %.2f\n", index, Scheduler::instance().clock());
 #endif // DEBUG
 
  rh->rp_type = AODVTYPE_HELLO;
- //rh->rp_flags = 0x00;
  rh->rp_hop_count = 1;
  rh->rp_dst = index;
- rh->rp_dst_seqno = seqno;
- rh->rp_lifetime = (1 + ALLOWED_HELLO_LOSS) * HELLO_INTERVAL;
 
- // ch->uid() = 0;
+ // CRAHNs Model START
+ // @author:  Marco Di Felice
+ 
+ // Includes current receiving channel in the HELLO message
+ rh->rp_channel = repository_->get_recv_channel(index);
+  
+ // Include channel information for neighbouring nodes (1-hop neighbours)
+  AODV_Neighbor *nb = nbhead.lh_first;
+  int counter_neighbours=0;
+
+ for (int i=0; i<MAX_HELLO_NEIGHBOURS; i++) {
+	if ((nb) && (nb->hop==1)) {	
+		rh->rp_neighbour_table[counter_neighbours].id= nb->nb_addr;
+		rh->rp_neighbour_table[counter_neighbours].channel=nb->channel;
+		counter_neighbours++;		
+ 	}
+		
+	if (nb)
+      	  nb = nb->nb_link.le_next;
+ }
+ 
+  // Fill the table with -1 values
+  for (int i=counter_neighbours; i<MAX_HELLO_NEIGHBOURS; i++) {
+	rh->rp_neighbour_table[i].id= -1;
+	rh->rp_neighbour_table[i].channel=-1;
+		
+ }
+  
+
+ // CRAHNs Model END
+
  ch->ptype() = PT_AODV;
  ch->size() = IP_HDR_LEN + rh->size();
  ch->iface() = -2;
@@ -1293,27 +1438,76 @@ fprintf(stderr, "sending Hello from %d at %.2f\n", index, Scheduler::instance().
  ih->dport() = RT_PORT;
  ih->ttl_ = 1;
 
- Scheduler::instance().schedule(target_, p, 0.0);
+ Scheduler::instance().schedule(downtarget_[CONTROL_RADIO], p, 0.0);
 }
 
 
 void
 AODV::recvHello(Packet *p) {
 //struct hdr_ip *ih = HDR_IP(p);
-struct hdr_aodv_reply *rp = HDR_AODV_REPLY(p);
+struct hdr_aodv_hello *rp = HDR_AODV_HELLO(p);
 AODV_Neighbor *nb;
+ 
+ // CRAHNs Model START
+ // @author:  Marco Di Felice
 
- nb = nb_lookup(rp->rp_dst);
- if(nb == 0) {
-   nb_insert(rp->rp_dst);
+ #ifdef CHANNEL_DEBUG
+ printf("---------------------------------------------------- \n");
+ printf(" [HELLO RECEIVED] Node: %d Neighbour 1-hop: %d Channel: %d \n", index, rp->rp_dst, rp->rp_channel); 
+ #endif 
+
+ update_neighbourhood(rp->rp_dst,rp->rp_channel,1);
+
+ // Add 2-hop neighbours information
+  
+ for (int i=0; i<MAX_HELLO_NEIGHBOURS; i++) {
+	if ((rp->rp_neighbour_table[i].id >=0) && (rp->rp_neighbour_table[i].id != index)) {
+		update_neighbourhood(rp->rp_neighbour_table[i].id,rp->rp_neighbour_table[i].channel,2);
+ 		
+		#ifdef CHANNEL_DEBUG
+		 printf(" [CHANNEL TABLE] Node %d Neighbour %d Channel: %d \n", index,rp->rp_neighbour_table[i].id, rp->rp_neighbour_table[i].channel); 
+		 #endif 
+
+	}
  }
- else {
-   nb->nb_expire = CURRENT_TIME +
-                   (1.5 * ALLOWED_HELLO_LOSS * HELLO_INTERVAL);
- }
+ 
+ #ifdef CHANNEL_DEBUG
+ printf(" ---------------------------------------------------- \n");
+ #endif 
+
+
+ // CRAHNs Model END
+ 
 
  Packet::free(p);
 }
+
+
+
+
+// CRAHNs Model START
+// @author:  Marco Di Felice
+// Insert a 1-hop or 2-hop neighbour in the Neighbour Table of AODV
+void 
+AODV::update_neighbourhood(int id, int channel, int hop) {
+ AODV_Neighbor *nb;
+ nb = nb_lookup(id);
+
+ if(nb == 0) {
+   nb_insert(id);
+   nb = nb_lookup(id);
+ }
+ 
+ else 
+   nb->nb_expire = CURRENT_TIME + (1.5 * ALLOWED_HELLO_LOSS * HELLO_INTERVAL);
+
+ // Update channel and hop informatio
+ nb->channel=channel;
+ nb->hop=hop;
+}
+
+
+// CRAHNs Model END
 
 void
 AODV::nb_insert(nsaddr_t id) {
@@ -1382,3 +1576,133 @@ double now = CURRENT_TIME;
  }
 
 }
+
+ // CRAHNs Model START
+ // @author:  Marco Di Felice
+ 
+void
+AODV::set_receiver_channel() {
+
+	
+	int num_feasible_channels=0;
+	int feasible_channels[MAX_CHANNELS];
+	bool need_to_switch=false;
+	int current_channel= repository_->get_recv_channel(index);
+	int minimum;
+
+	switch(channel_allocation_mode_) {
+		
+		// MIN_INTERFERERS policy: prefer the channel which is less used by 1- and 2- hops neighbouring nodes
+		case MIN_INTERFERENCE_POLICY:
+			
+			// Compute number of receivers on each channel
+			compute_receivers_for_channels();
+			// Get the number of receivers on the best channel
+			minimum=num_recv_channels_[get_less_interfered_channel()];							
+
+			for (int i=1; i<MAX_CHANNELS; i++) 
+				if (num_recv_channels_[i] == minimum) {
+
+					// Maybe there might be more than one option ...
+					feasible_channels[num_feasible_channels]=i;
+					num_feasible_channels++;
+
+					// Channel switching is performed if the new channel is less interfered for a CONVENIENCE_THRESHOLD factor. at least
+					//printf("Num receivers on current channel %d next %d \n",num_recv_channels_[current_channel], num_recv_channels_[i]);
+					if ((num_recv_channels_[current_channel] - num_recv_channels_[i]) >= CONVENIENCE_THRESHOLD)
+						need_to_switch=true;		
+			}
+			
+			// There is a less-interfered channel which can be used ...		
+			if (need_to_switch) {
+				// Randomly choose between less-used channels
+				int channel=((int)(Random::uniform()*num_feasible_channels));		
+				if (channel >= num_feasible_channels)
+					channel = num_feasible_channels - 1;
+
+				#ifdef CHANNEL_DEBUG
+				printf("[ CHANNEL SELECTION ] NODE: %d CHANNEL: %d \n",index,feasible_channels[channel]);
+				#endif			
+				
+				// Update global data structure with channel decision
+				repository_->set_recv_channel(index,feasible_channels[channel]);
+			}
+			
+			
+			break;	
+
+		// Other channel allocation policies can be defined here ...
+		// IMPLEMENT HERE your own policy
+	}
+	
+}
+
+
+
+
+#define MAXIMUM_NODES 200
+// compute_receivers_for_channel: Compute the number of current receivers for each channel
+// Return the ID of the channel which is less interfered by other nodes
+void
+AODV::compute_receivers_for_channels() {
+	AODV_Neighbor *nb = nbhead.lh_first;
+	AODV_Neighbor *nbn;
+	int minimum=100000;
+
+	bool already_seen[MAXIMUM_NODES];
+ 
+	// Initialize the number of interferers for channel ...
+	for (int i=0; i<MAX_CHANNELS; i++)
+		num_recv_channels_[i]=0;
+  
+	for (int i=0; i< MAXIMUM_NODES; i++)
+		already_seen[i]=false;
+
+	for(; nb; nb = nbn) {
+   
+	   // We should  count the same receiver only once ...
+ 	  	if (already_seen[nb->nb_addr] == false) {
+ 			  num_recv_channels_[nb->channel]++;
+			  already_seen[nb->nb_addr]=true;
+   		}
+  
+   		nbn = nb->nb_link.le_next;
+	}
+
+}
+
+
+
+//get_less_interfered_channel: Return the channel with the lowest number of nodes tx on it
+int 
+AODV::get_less_interfered_channel() {
+	
+	int minimum=100000;
+	int channel_id;
+
+	for (int i=0; i<MAX_CHANNELS; i++) {
+		if (num_recv_channels_[i] < minimum) {
+			minimum=num_recv_channels_[i];
+			channel_id=i;
+		}
+	}
+	
+	return channel_id;
+}
+
+
+
+//recvNotification: receive a notification about the detection of an active PU on the rx channel
+//Spectrum Decision/mobility has been performed at MAC Layer
+//The CR informs the neighbouring nodes about the selection of the new channel
+void
+AODV::recvNotification(Packet *p) {
+
+	// Notify the occurrence of a spectrum Handoff to the neighbouring nodes
+	sendHello();
+
+	Packet::free(p);
+}
+
+ // CRAHNs Model END
+ 

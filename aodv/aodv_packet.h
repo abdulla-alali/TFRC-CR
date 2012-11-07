@@ -54,6 +54,16 @@ The AODV code developed by the CMU/MONARCH group was optimized and tuned by Sami
 #define HDR_AODV_ERROR(p)	((struct hdr_aodv_error*)hdr_aodv::access(p))
 #define HDR_AODV_RREP_ACK(p)	((struct hdr_aodv_rrep_ack*)hdr_aodv::access(p))
 
+
+
+// CRAHNs Model START
+// @author:  Marco Di Felice
+
+#define HDR_AODV_HELLO(p)	((struct hdr_aodv_hello*)hdr_aodv::access(p))
+
+// CRAHNs Model END
+
+
 /*
  * General AODV Header - shared by all formats
  */
@@ -119,6 +129,7 @@ struct hdr_aodv_reply {
 
         double          rp_timestamp;           // when corresponding REQ sent;
 						// used to compute route discovery latency
+	int 		rp_channel;
 						
   inline int size() { 
   int sz = 0;
@@ -162,10 +173,62 @@ struct hdr_aodv_error {
 
 };
 
+
+
+// CRAHNs Model START
+// @author:  Marco Di Felice
+
+#define MAX_HELLO_NEIGHBOURS 10
+
+
+// Neighbour Channel Table
+struct neighbour_info  {
+
+	//neighbour id
+	int 		id;
+
+	//neighbour receiving channel
+	u_int8_t	channel;
+};
+
+
+// Format of the HELLO message 
+struct hdr_aodv_hello {
+        u_int8_t        rp_type;        // Packet Type
+        u_int8_t        reserved[2];
+        u_int8_t        rp_hop_count;           // Hop Count
+        nsaddr_t        rp_dst;                 // Destination IP Address
+        nsaddr_t        rp_src;                 // Source IP Address
+
+        double          rp_timestamp;           // when corresponding REQ sent;
+						// used to compute route discovery latency
+						
+	// current receiving channel on the receiving interface
+	u_int8_t 	rp_channel;
+	// channel table with neighbours' channel information
+	neighbour_info	rp_neighbour_table[MAX_HELLO_NEIGHBOURS];	
+
+						
+        inline int size() { 
+  
+	 int sz = 0;
+	  	sz =  sizeof(double) + 4*sizeof(u_int8_t) + 2*sizeof(nsaddr_t) + MAX_HELLO_NEIGHBOURS * sizeof(neighbour_info);
+  		assert (sz >= 0);
+		return sz;
+  	}
+
+};
+
+// CRAHNs Model END
+
+
+
 struct hdr_aodv_rrep_ack {
 	u_int8_t	rpack_type;
 	u_int8_t	reserved;
 };
+
+
 
 // for size calculation of header-space reservation
 union hdr_all_aodv {
@@ -174,6 +237,7 @@ union hdr_all_aodv {
   hdr_aodv_reply    rrep;
   hdr_aodv_error    rerr;
   hdr_aodv_rrep_ack rrep_ack;
+  hdr_aodv_hello    rrhello;
 };
 
 #endif /* __aodv_packet_h__ */

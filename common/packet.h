@@ -170,6 +170,8 @@ enum packet_t {
 	// Bell Labs Traffic Trace Type (PackMime OL)
 	PT_BLTRACE, 
 
+	PT_NOTIFICATION,
+
 	// insert new packet types here
 	PT_NTYPE // This MUST be the LAST one
 };
@@ -269,6 +271,8 @@ public:
 		// Bell Labs (PackMime OL)
 		name_[PT_BLTRACE]="BellLabsTrace";
 		
+		name_[PT_NOTIFICATION]="Notification";
+	
 		name_[PT_NTYPE]= "undefined";
 	}
 	const char* name(packet_t p) const { 
@@ -472,6 +476,7 @@ struct hdr_cmn {
 	int      addr_type_;    // type of next_hop_ addr
 	nsaddr_t last_hop_;     // for tracing on multi-user channels
 
+	int 	channel_;
         // called if pkt can't obtain media or isn't ack'd. not called if
         // droped by a queue
         FailureCallback xmit_failure_; 

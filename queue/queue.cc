@@ -80,9 +80,22 @@ void PacketQueue::remove(Packet* pkt, Packet *prev) //XXX: screwy
 	return;
 }
 
-void QueueHandler::handle(Event*)
+
+void QueueHandler::handle(Event* e)
 {
-	queue_.resume();
+	
+	// CRAHNs Model START
+	// @author: Marco Di Felice
+
+	if (e !=NULL)
+		// Data Packet on the tx interface		
+		queue_.resume(((EventSwitch *)e)->channel);
+	else
+		// Control Packet, on the control interace
+		queue_.resume();
+	// CRAHNs Model END
+	
+	
 }
 
 Queue::~Queue() {
@@ -111,13 +124,30 @@ Queue::Queue() : Connector(), blocked_(0), unblock_on_resume_(1), qh_(*this),
 			util_buf_[i] = 0;
 		}
 	}
+	
+
+	// CRAHNs Model START
+	// @author: Marco Di Felice
+
+	current_tuned_channel_=-1;
+	// CRAHNs Model END
+
 }
+
+
 
 void Queue::recv(Packet* p, Handler*)
 {
 	double now = Scheduler::instance().clock();
+
+
 	enque(p);
-	if (!blocked_) {
+	
+	// CRAHNs Model START
+	// @author: Marco Di Felice
+	
+
+	if (!blocked_ && ( current_tuned_channel_==-1 ) ) {
 		/*
 		 * We're not blocked.  Get a packet and send it on.
 		 * We perform an extra check because the queue
@@ -132,6 +162,26 @@ void Queue::recv(Packet* p, Handler*)
 			target_->recv(p, &qh_);
 		}
 	}
+
+	else if (!blocked_ && (current_tuned_channel_==HDR_CMN(p)->channel_)) {
+		/*
+		 * We're not blocked.  Get a packet and send it on.
+		 * We perform an extra check because the queue
+		 * might drop the packet even if it was
+		 * previously empty!  (e.g., RED can do this.)
+		 */
+		p = pq_->dequePacket_from_channel(HDR_CMN(p)->channel_);
+
+		if (p != 0) {
+			utilUpdate(last_change_, now, blocked_);
+			last_change_ = now;
+			blocked_ = 1;
+			target_->recv(p, &qh_);
+		}
+	}
+	
+	// CRAHNs Model END
+
 }
 
 void Queue::utilUpdate(double int_begin, double int_end, int link_state) {
@@ -235,4 +285,66 @@ void Queue::reset()
 	while ((p = deque()) != 0)
 		drop(p);
 }
+
+
+
+
+
+
+/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ * SWITCHABLE INTERFACE IFQ Layer
+ * ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+
+// CRAHNs Model START
+// @author: Marco Di Felice
+
+// resume: Called by MAC Layer when a new packet has been sent, and a new packet has to be sent down
+void 
+Queue::resume(int channel)
+{
+	double now = Scheduler::instance().clock();
+	Packet* p = pq_->dequePacket_from_channel(channel);
+
+
+	current_tuned_channel_=channel;
+	if (p != 0) {
+		target_->recv(p, &qh_);
+	} else {
+		if (unblock_on_resume_) {
+			utilUpdate(last_change_, now, blocked_);
+			last_change_ = now;
+			blocked_ = 0;
+		}
+		else {
+			utilUpdate(last_change_, now, blocked_);
+			last_change_ = now;
+			blocked_ = 1;
+		}
+	}
+}
+
+
+
+// dequeuePacket_from_channel: deque a packet which has to be sent on a specific channel
+Packet* PacketQueue::dequePacket_from_channel(int channel)
+{
+
+
+	for (Packet *pp= 0, *p= head_; p; pp= p, p= p->next_) {
+		if (HDR_CMN(p)->channel_ == channel) {
+			if (!pp) deque();
+			else {
+				if (p == tail_) 
+					tail_= pp;
+				pp->next_= p->next_;
+				--len_;
+				bytes_ -= hdr_cmn::access(p)->size();
+			}
+			return p;
+		}
+	}
+	return 0;
+}
+
+// CRAHNs Model END
 

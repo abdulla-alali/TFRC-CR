@@ -287,7 +287,14 @@ double WirelessChannel::highestAntennaZ_ = -1; // i.e., uninitialized
 double WirelessChannel::distCST_ = -1;
 
 WirelessChannel::WirelessChannel(void) : Channel(), numNodes_(0), 
-					 xListHead_(NULL), sorted_(0) {}
+					 xListHead_(NULL), sorted_(0) {
+
+	 //Modified by felicepizzi for LB-NET
+	 for(int i = 0; i < 100; i++) {
+   		 myList[i] = NULL;
+  	}
+
+}
 
 int WirelessChannel::command(int argc, const char*const* argv)
 {
@@ -365,7 +372,7 @@ WirelessChannel::sendUp(Packet* p, Phy *tifp)
 		 int numAffectedNodes = -1, i;
 		 
 		 if(!sorted_){
-			 sortLists();
+			 //sortLists();
 		 }
 		 
 		 affectedNodes = getAffectedNodes(mtnode, distCST_ + /* safety */ 5, &numAffectedNodes);
@@ -380,9 +387,32 @@ WirelessChannel::sendUp(Packet* p, Phy *tifp)
 			 propdelay = get_pdelay(tnode, rnode);
 			 
 			 rifp = (rnode->ifhead()).lh_first;
+			/*
 			 for(; rifp; rifp = rifp->nextnode()){
 				 s.schedule(rifp, newp, propdelay);
 			 }
+			*/
+			
+			//Modified by felicepizzi for LB-NET
+			for(; rifp; rifp = rifp->nextnode()) {
+			
+				if (rifp->channel() == this) {
+					s.schedule(rifp, newp->copy(), propdelay);
+					//break;
+				}
+
+     			 /*      if (rifp->channel() == this) {
+					//printf("HELLO counter %d \n", counter);
+					counter++;
+			      		// Only the right channel gets the copy
+      				         s.schedule(rifp, newp, propdelay);
+      		                         break;
+                                }
+				*/
+                        }
+
+			Packet::free(newp);
+
 		 }
 		 delete [] affectedNodes;
 	 }
@@ -394,7 +424,9 @@ void
 WirelessChannel::addNodeToList(MobileNode *mn)
 {
 	MobileNode *tmp;
-
+	
+	//Modified by felicepizzi for LB-NET
+	myList[numNodes_] = mn;
 	// create list of mobilenodes for this channel
 	if (xListHead_ == NULL) {
 		fprintf(stderr, "INITIALIZE THE LIST xListHead\n");
@@ -580,6 +612,7 @@ WirelessChannel::getAffectedNodes(MobileNode *mn, double radius,
 	// First allocate as much as possibly needed
 	tmpList = new MobileNode*[numNodes_];
 	
+	/*	
 	for(tmp = xListHead_; tmp != NULL; tmp = tmp->nextX_) tmpList[n++] = tmp;
 	for(int i = 0; i < n; ++i)
 		if(tmpList[i]->speed()!=0.0 && (Scheduler::instance().clock() -
@@ -596,7 +629,16 @@ WirelessChannel::getAffectedNodes(MobileNode *mn, double radius,
 			tmpList[n++] = tmp;
 		}
 	}
+	*/
 	
+	// Modified by felicepizzi for LB-NET  
+	for(int i = 0; i < numNodes_; i++) {
+	      if(myList[i]->X() >= xmin && myList[i]->X() <= xmax && myList[i]->Y() >= ymin && myList[i]->Y() <= ymax) {
+	            tmpList[n++] = myList[i];
+	      }
+	}
+	
+
 	list = new MobileNode*[n];
 	memcpy(list, tmpList, n * sizeof(MobileNode *));
 	delete [] tmpList;
