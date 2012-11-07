@@ -1,0 +1,9 @@
+*.o
+ns
+gen/*
+common/ptypes2tcl
+.cproject
+.project
+configure.log
+config.log
+Makefile
