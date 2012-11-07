@@ -1,3 +1,17 @@
+/* This code is the CRAHN implementation as documented by this paper:
+ * M. Di Felice, K. Chowdhury, W. Kim, A. Kassler, L. Bononi, End-to-end
+ * Protocols for Cognitive Radio Ad Hoc Networks: An Evaluation Study, 
+ * in Performance Evaluation (Elsevier), Vo. 68, No. 9, pp. 859-875, 2011.
+ * http://www.sciencedirect.com/science/article/pii/S0166531610001604
+ *
+ *
+ * To compile simply download ns-allinone-2.31 and replace the 
+ * subdirectory ns-2.31 with the one you clone from here (i.e. 
+ * git clone git://github.com/abdulla-alali/TFRC-CR.git -b CRAHN) 
+ * then execute "make" again.
+*/
+
+
 @(#) $Header: /cvsroot/nsnam/ns-2/README,v 1.5 2000/11/02 22:46:37 johnh Exp $
 
 ns has been maintained by the
