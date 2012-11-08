@@ -1118,6 +1118,93 @@ Agent/TFRCSink set numPkts_ 1;	# Num non-sequential packets before loss
 				#    to a major bug.
 Agent/TFRCSink set bytes_ 0 ;	# For counting bytes received.
 
+
+#---- TFRC for Cognitive Radio by Abdulla --------
+# Dynamic state:
+Agent/TFRC_CR set rate_ 0 
+Agent/TFRC_CR set ndatapack_ 0 ;	# Number of packets sent
+Agent/TFRC_CR set ndatabytes_ 0 ;	# Number of bytes sent
+Agent/TFRC_CR set true_loss_rate_ 0.0 ; # For statistics only.
+# RTT:
+Agent/TFRC_CR set srtt_init_ 0 ;	# Variables for tracking RTT	
+Agent/TFRC_CR set rttvar_init_ 12  
+Agent/TFRC_CR set rtxcur_init_ 6.0	
+Agent/TFRC_CR set rttvar_exp_ 2	
+Agent/TFRC_CR set T_SRTT_BITS 3	
+Agent/TFRC_CR set T_RTTVAR_BITS 2	
+# VoIP mode:
+Agent/TFRC_CR set voip_ 0 ;        # Added on 10/23/2004      
+				# 1 for voip mode.
+Agent/TFRC_CR set voip_max_pkt_rate_ 100 ;  # Max rate in pps, for voip mode.
+Agent/TFRC_CR set fsize_ 1460 ;	# Default size for large TCP packets. 
+				# Used for VoIP mode.
+Agent/TFRC_CR set headersize_ 32 ; # Size for packet headers.
+# Variants in the TFRC algorithms:
+Agent/TFRC_CR set rate_init_option_ 2 ;	# Added on 10/20/2004
+				# Set to 1 for backward compatibility. 
+				# Set to 2 for RFC 3390 initial rates
+				# Default changed on 10/21/2004.
+Agent/TFRC_CR set slow_increase_ 1 ;	# Added on 10/20//2004
+				# Set to 1 for gradual rate changes.  
+				# This also gives backward compatibility.
+# Agent/TFRC set ss_changes_ 1 ;	# Deleted on 3/14//2006. 
+Agent/TFRC_CR set maxHeavyRounds_ 1; # Number of rounds for sending rate allowed
+				  #  to be greater than twice receiving rate.
+Agent/TFRC_CR set conservative_ 0 ;  # Set to true for a conservative 
+				  # response to heavy congestion.
+Agent/TFRC_CR set scmult_ 1.5 ;	# self clocking parameter for conservative_
+Agent/TFRC_CR set oldCode_ false ; # Set to 1 to use old code for datalimited
+				#   applications.
+				# Parameter added on 12/18/02.
+# Parameters:
+Agent/TFRC_CR set packetSize_ 1000 
+Agent/TFRC_CR set df_ 0.95 ;	# decay factor for accurate RTT estimate
+Agent/TFRC_CR set tcp_tick_ 0.1 ;	
+Agent/TFRC_CR set InitRate_ 300 ;	# Initial send rate	
+Agent/TFRC_CR set overhead_ 0 ;	# If > 0, dither outgoing packets
+Agent/TFRC_CR set ssmult_ 2 ; 	# Rate of increase during slow-start:
+Agent/TFRC_CR set bval_ 1 ;	# Value of B for TCP formula
+Agent/TFRC_CR set ca_ 1 ; 	 	# Enable Sqrt(RTT) congestion avoidance
+Agent/TFRC_CR set printStatus_ 0 
+Agent/TFRC_CR set ecn_ 0 ;		# Set to 1 for ECN-capable connection.
+Agent/TFRC_CR set minrto_ 0.0 ;	# Minimum RTO, for use in TCP equation.
+				# The default is not to use minrto_.
+Agent/TFRC_CR set SndrType_ 0 ;    # Set to 1 to use data-producing applications
+                                #   such as FTP.
+Agent/TFRC_CR set maxqueue_ MAXSEQ ;  # queue from application.
+Agent/TFRC_CR set rate_init_ 2 ;		# Added on 10/20/2004
+				# Set to 1 for backward compatibility. 
+				# Default changed on 10/21/2004.
+Agent/TFRC_CR set useHeaders_ true ;	# Added on 2005/06/24. 
+Agent/TFRC_CR set idleFix_ true ;	# Added on 2006/03/12.
+
+Agent/TFRC_CR_Sink set packetSize_ 40
+Agent/TFRC_CR_Sink set InitHistorySize_ 100000
+Agent/TFRC_CR_Sink set NumFeedback_ 1 
+Agent/TFRC_CR_Sink set AdjustHistoryAfterSS_ 1
+Agent/TFRC_CR_Sink set NumSamples_ -1
+Agent/TFRC_CR_Sink set discount_ 1;	# History Discounting
+Agent/TFRC_CR_Sink set printLoss_ 0
+Agent/TFRC_CR_Sink set smooth_ 1 ;	# smoother Average Loss Interval
+Agent/TFRC_CR_Sink set ShortIntervals_ 0 ; #  For calculating loss event rates 
+                        	# for short loss intervals differently
+Agent/TFRC_CR_Sink set ShortRtts_ 2 ; # Max num of RTTs in a short interval.
+Agent/TFRC_CR_Sink set minlc_ 4
+Agent/TFRC_CR_Sink set algo_ 1 ;  	# 1: algo from sigcomm paper 2: ewma 
+				# 3: fixed window
+Agent/TFRC_CR_Sink set binMultiplier 1; #used for WALI2
+Agent/TFRC_CR_Sink set maxint_ 1000 ;     # max loss interval history 
+Agent/TFRC_CR_Sink set history_ 0.75 ;    # loss history for EWMA
+Agent/TFRC_CR_Sink set PreciseLoss_ 1 ;   # 1 for more precise loss events
+				      # Introduced on 12/11/02, default 1.
+				      # No change in performance.
+Agent/TFRC_CR_Sink set numPkts_ 1;	# Num non-sequential packets before loss
+				# Introduced on 12/12/02, with default 1.
+				# Default changed to 3 on 12/16/02.
+				# Default changed to 1 on 10/28/03 due
+				#    to a major bug.
+Agent/TFRC_CR_Sink set bytes_ 0 ;	# For counting bytes received.
+
 if [TclObject is-class Agent/TCP/FullTcp] {
 	Agent/TCP/FullTcp set segsperack_ 1; # ACK frequency
 	Agent/TCP/FullTcp set spa_thresh_ 0; # below do 1 seg per ack [0:disable]

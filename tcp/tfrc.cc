@@ -271,6 +271,7 @@ void TfrcAgent::nextpkt()
 		} else
 			xrate = rate_;
 	}
+	printf("%f - sender_ xrate = %f\n", Scheduler::instance().clock(), xrate);
 	if (xrate > SMALLFLOAT) {
 		next = size_/xrate;
 		if (voip_) {

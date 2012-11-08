@@ -52,7 +52,7 @@ PERL	= @PERL@
 # for diffusion
 #DIFF_INCLUDES = "./diffusion3/main ./diffusion3/lib ./diffusion3/nr ./diffusion3/ns"
 
-CCOPT	= @V_CCOPT@ 
+CCOPT	= @V_CCOPT@ -g
 STATIC	= @V_STATIC@
 #LDFLAGS	= $(STATIC)
 LDFLAGS	= @LDFLAGS@
@@ -269,6 +269,7 @@ OBJ_CC = \
 	tcp/tfrc.o tcp/tfrc-sink.o mobile/energy-model.o apps/ping.o tcp/tcp-rfc793edu.o \
 	queue/rio.o queue/semantic-rio.o tcp/tcp-sack-rh.o tcp/scoreboard-rh.o \
 	plm/loss-monitor-plm.o plm/cbr-traffic-PP.o \
+	tcp/tfrc-cr.o tcp/tfrc-cr-sink.o \
 	linkstate/hdr-ls.o \
 	mpls/classifier-addr-mpls.o mpls/ldp.o mpls/mpls-module.o \
 	routing/rtmodule.o classifier/classifier-hier.o \

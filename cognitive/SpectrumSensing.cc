@@ -46,7 +46,9 @@ SpectrumSensing::sense(int id, double sense_time, double transmit_time, int chan
 		if ((randomValue < prob_misdetect_) and cr_on)
 			cr_on=false;
 	}
-		
+//#ifdef SENSING_VERBOSE_MODE
+//	printf("[SENSING-DBG] Node %d sensed pu activity on channel %d at time %f\n", id, channel, Scheduler::instance().clock());
+//#endif
 	return cr_on;	
 		
 }

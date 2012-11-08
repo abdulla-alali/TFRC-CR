@@ -149,6 +149,8 @@ foreach prot {
 	TCPA 	# Asymmetric TCP, transport protocol
 	TFRC 	# TFRC, transport protocol
 	TFRC_ACK 	# TFRC, transport protocol
+	TFRC_CR	# TFRC_CR, transport protocol - added by Abdulla
+	TFRC_CR_ACK	#TFRC_CR, transport protocol - added by Abdulla
 	XCP 	# XCP, transport protocol
 # Application-Layer Protocols:
 	Message # a protocol to carry text messages

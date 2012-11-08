@@ -245,7 +245,7 @@ CMUTrace::format_mac_common(Packet *p, const char *why, int offset)
                 x,
                 y,
 #endif
-		tracename,
+		tracename, //word MAC //abdulla
 		why,
 		
                 ch->uid(),                      // identifier for this event
@@ -273,7 +273,7 @@ CMUTrace::format_mac_common(Packet *p, const char *why, int offset)
 		  (sh->type == ACK_PKT) ? "ACK" :
 		  (sh->type == SYNC_PKT) ? "SYNC" :
 		  "UNKN") : 
-		 packet_info.name(ch->ptype())),
+		 packet_info.name(ch->ptype())), //this gets the name of the packet "tfrcFriend" for example
 		ch->size());
 	
 	offset = strlen(pt_->buffer());

@@ -58,7 +58,6 @@
 #include "agent.h"
 #include "basetrace.h"
 
-
 /* our backoff timer doesn't count down in idle times during a
  * frame-exchange sequence as the mac tx state isn't idle; genreally
  * these idle times are less than DIFS and won't contribute to
@@ -93,6 +92,7 @@ Mac802_11::checkBackoffTimer()
 inline void
 Mac802_11::transmit(Packet *p, double timeout)
 {
+
 	tx_active_ = 1;
 	
 	if (EOTtarget_) {
@@ -201,7 +201,8 @@ Mac802_11::Mac802_11() :
 	mhRecv_(this), mhSend_(this), 
 	mhDefer_(this), mhBackoff_(this), mhQueue_(this), mhSwitch_(this)
 {
-	
+
+	printf("mac address %i\n", index_);
 	nav_ = 0.0;
 	tx_state_ = rx_state_ = MAC_IDLE;
 	tx_active_ = 0;
@@ -219,7 +220,7 @@ Mac802_11::Mac802_11() :
 	
 	// chk if basic/data rates are set
 	// otherwise use bandwidth_ as default;
-	
+
 	Tcl& tcl = Tcl::instance();
 	tcl.evalf("Mac/802_11 set basicRate_");
 	if (strcmp(tcl.result(), "0") != 0) 
@@ -228,7 +229,7 @@ Mac802_11::Mac802_11() :
 		basicRate_ = bandwidth_;
 
 	tcl.evalf("Mac/802_11 set dataRate_");
-	if (strcmp(tcl.result(), "0") != 0) 
+	if (strcmp(tcl.result(), "0") != 0)
 		bind_bw("dataRate_", &dataRate_);
 	else
 		dataRate_ = bandwidth_;
@@ -248,12 +249,15 @@ Mac802_11::Mac802_11() :
 	channel_switching_=false;
 
 	// Initiliaze the switching policy for the queue management
-	switchable_policy_=ROUND_ROBIN_ACTIVE_CHANNELS;
+	switchable_policy_=ROUND_ROBIN_ACTIVE_CHANNELS;  //marco prefers this one
+	//switchable_policy_=ROUND_ROBIN_ALL_CHANNELS;
+	///////////////////switchable_policy_=ROUND_ROBIN_ALL_CHANNELS;
 	
 	if (index_%MAX_RADIO == RECEIVER_RADIO)
-		sm_=new SpectrumManager(this,index_/MAX_RADIO,0.1,1.0);
+		sm_=new SpectrumManager(this,index_/MAX_RADIO,0.1,3.0);
 
 	// CRAHNs Model END
+	printf("setting dataRate to %f\n", dataRate_);
 
 
 }
@@ -330,7 +334,7 @@ Mac802_11::command(int argc, const char*const* argv)
 
 			return TCL_OK;
 
-		} 
+		}
 		// CRAHNs Model END
 	
 	}
@@ -486,12 +490,16 @@ Mac802_11::is_idle()
 	// @author:  Marco Di Felice	
 
 	// Check if the CR is doing sensing OR is performing a spectrum handoff
-	if ((index_%MAX_RADIO == RECEIVER_RADIO) && (!sm_->is_channel_available()) )
-		return 0;	
+	if ((index_%MAX_RADIO == RECEIVER_RADIO) && (!sm_->is_channel_available()) ) {
+		printf("%f - not idle at receiver\n", Scheduler::instance().clock());
+		return 0;
+	}
 
 	// Check if the CR is switching channel on the TX interface
-	if ((index_%MAX_RADIO == TRANSMITTER_RADIO) && (channel_switching_))
+	if ((index_%MAX_RADIO == TRANSMITTER_RADIO) && (channel_switching_)) {
+		printf("%f - not idle because at sender\n", Scheduler::instance().clock());
 		return 0;	
+	}
 
 	// CRAHNs Model END
 	// @author:  Marco Di Felice	
@@ -616,6 +624,7 @@ Mac802_11::tx_resume()
 		 *  Need to send a CTS or ACK.
 		 */
 		mhDefer_.start(phymib_.getSIFS());
+		printf("%f - node %i sending at: %f\n", index_/MAX_RADIO, Scheduler::instance().clock(), phymib_.getSIFS());
 	} else if(pktRTS_) {
 		if (mhBackoff_.busy() == 0) {
 			if (bugFix_timer_) {
@@ -801,6 +810,7 @@ Mac802_11::check_pktCTRL()
 	 */
 	case MAC_Subtype_CTS:
 		if(!is_idle()) {
+			printf("medium not idle\n");
 			discard(pktCTRL_, DROP_MAC_BUSY); pktCTRL_ = 0;
 			return 0;
 		}
@@ -987,6 +997,7 @@ Mac802_11::sendRTS(int dst)
 void
 Mac802_11::sendCTS(int dst, double rts_duration)
 {
+
 	Packet *p = Packet::alloc();
 	hdr_cmn* ch = HDR_CMN(p);
 	struct cts_frame *cf = (struct cts_frame*)p->access(hdr_mac::offset_);
@@ -1154,6 +1165,7 @@ Mac802_11::sendDATA(Packet *p)
 		dh->dh_duration = 0;
 	}
 	pktTx_ = p;
+	printf("sending packet at node=%i interface=%i datarate=%f and basicrate=%f\n", (index_/MAX_RADIO), (index_%MAX_RADIO), dataRate_, basicRate_);
 }
 
 /* ======================================================================
@@ -1162,6 +1174,7 @@ Mac802_11::sendDATA(Packet *p)
 void
 Mac802_11::RetransmitRTS()
 {
+	if (pktTx_==NULL) return; //ns-2 bug !
 	assert(pktTx_);
 	assert(pktRTS_);
 	assert(mhBackoff_.busy() == 0);
@@ -1203,6 +1216,7 @@ Mac802_11::RetransmitRTS()
 void
 Mac802_11::RetransmitDATA()
 {
+
 	struct hdr_cmn *ch;
 	struct hdr_mac802_11 *mh;
 	u_int32_t *rcount, thresh;
@@ -1280,6 +1294,7 @@ Mac802_11::RetransmitDATA()
 void
 Mac802_11::send(Packet *p, Handler *h)
 {
+
 	double rTime;
 	struct hdr_mac802_11* dh = HDR_MAC802_11(p);
 
@@ -1397,7 +1412,6 @@ Mac802_11::recv(Packet *p, Handler *h)
 	// Discard the packet ef it is received on a channel on which my radio interface is not tuned
 	if  (hdr->channel_ != current_channel)  {
 
-		
 		Packet::free(p);
 		p=0;
 
@@ -1433,7 +1447,8 @@ Mac802_11::recv(Packet *p, Handler *h)
 
 		// Check if a PU is active while receiving the packet
 		if (sm_->is_PU_interfering(p))
-			hdr->error() = 1;		 	
+			hdr->error() = 1;
+
 
 	}
 	#endif
@@ -1628,7 +1643,6 @@ void
 Mac802_11::recvRTS(Packet *p)
 {
 	struct rts_frame *rf = (struct rts_frame*)p->access(hdr_mac::offset_);
-
 	if(tx_state_ != MAC_IDLE) {
 		discard(p, DROP_MAC_BUSY);
 		return;
@@ -1886,6 +1900,9 @@ Mac802_11::recvACK(Packet *p)
 
 
 //switchqueueHandler: Handler for queue switching, based on the actual switchable_policy 
+//you got queues per channel and switching is happening here
+//a new channel is selected when channel hasn't been sending for more than 2 seconds. defined TIMEOUT_ALIVE.. change?
+//this is what causes channels to switch when AODV decides to refresh with HELLO messages
 void
 Mac802_11::switchqueueHandler()
 {
@@ -1924,6 +1941,9 @@ Mac802_11::switchqueueHandler()
 			 // No next channel was found. Keep transmitting on the current channel
 			 if (!end)
 				new_switchable_channel_=prev_channel;
+			 if (new_switchable_channel_!=prev_channel) {
+				 printf("switching channel on interface %i from channel %i to channel %i\n", (index_/MAX_RADIO), prev_channel, new_switchable_channel_);
+			 }
 
 			 break;
 
@@ -2008,13 +2028,75 @@ Mac802_11::notifyUpperLayer(int channel) {
 // load_spectrum: load the spectrum characteristics (bandwidth/PER/...)
 void 
 Mac802_11::load_spectrum(spectrum_entry_t spectrum) {
-	
+	printf("loading spectrum dataRate=%f and the bandwidth=%f\n", dataRate_, spectrum.bandwidth);
 	dataRate_=spectrum.bandwidth;
 	per_=spectrum.per;
+	printf("loaded dataRate %f on interface %i\n", dataRate_, index_%MAX_RADIO);
 }
 
 
 
 // CRAHNs Model END
 
+//channel utilization
+/*
+void
+Mac802_11::ChanUtil_Calculate()
+{
+     //if mac is not idle
+     if(!is_idle()){
+         //increase channel utilization counter
+    	 printf("increasing channel utilization");
+         increaseChanUtil();
+         printf("end of increasing channel utilization");
+     }
+
+}
+
+//channel utilization
+
+void
+Mac802_11::CalChanUtil_Calculate()
+{
+        if (((fp = fopen("channelUtilization.txt", "a")) != NULL) )
+        {
+
+                //fprintf(fp, "%lf %d %lf\n",NOW,((MobileNode*)(netif_->node()))->nodeid(),getChanUtil()/100);
+
+                fclose(fp);
+
+                resetChanUtil();
+
+        } else {
+                printf("fail to open file");
+        }
+
+}*/
+
+//Timer for recording  channel utilzation
+/*void ChanUtil_Timer::expire(Event *)
+{
+
+	printf("setting up expire timer");
+   //a_->ChanUtil_Calculate();
+
+   //Traffic timer expires for every node or the node specified
+
+   resched(0.01);
+
+}
+
+//Timer for calculating channel utilzation
+void CalChanUtil_Timer::expire(Event *)
+{
+
+	printf("setting up expire timer2");
+   //a_->CalChanUtil_Calculate();
+
+   //Traffic timer expires for every node or the node specified
+
+   resched(1);
+
+}
+*/
 

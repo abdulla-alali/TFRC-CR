@@ -339,7 +339,7 @@ class AODV: public Agent {
 
 	// Channel Allocation timer
 	// Every HELLO_REFRESH_TIMER seconds, a Mesh node performs channel decision and broadcasts an HELLO message
-	#define HELLO_REFRESH_TIMER 500
+	#define HELLO_REFRESH_TIMER 1000
 
 	// Channel Allocation Threshold
 	// A node is considered active if it forwards at least PACKET_ACTIVE_THRESHOLD data packets in an HELLO_REFRESH_TIMER interval

@@ -42,6 +42,7 @@
 #include "sctp.h"
 #include "rtp.h"
 #include "srm.h"
+#include "tfrc-cr.h"
 #include "tfrc.h"
 #include "flags.h"
 #include "address.h"
@@ -192,6 +193,7 @@ Trace::get_seqno(Packet* p)
 	hdr_rtp *rh = hdr_rtp::access(p);
         hdr_rap *raph = hdr_rap::access(p);
 	hdr_tfrc *tfrch = hdr_tfrc::access(p);
+	hdr_tfrc_cr *tfrch_cr = hdr_tfrc_cr::access(p);
 	hdr_tfrc_ack *tfrch_ack = hdr_tfrc_ack::access(p);
 	packet_t t = th->ptype();
 	int seqno;
@@ -209,6 +211,8 @@ Trace::get_seqno(Packet* p)
 		seqno = tfrch->seqno;
 	else if (t == PT_TFRC_ACK)
                 seqno = tfrch_ack->seqno;
+	else if (t == PT_TFRC_CR)
+		seqno = tfrch_cr->seqno;
 	else
 		seqno = -1;
  	return seqno;

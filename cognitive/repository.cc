@@ -27,6 +27,10 @@ Repository::Repository() {
 		repository_table[i].recv_channel= channel;
 	}
 
+	for (int i=0; i<5; i++) {
+		printf("node %i got channel %i\n", i, repository_table[i].recv_channel);
+	}
+
 	// Initialize each sending channel as NOT active for each node
 	for (int node=0; node<MAX_NODES; node++) 
 		for (int channel=0; channel< MAX_CHANNELS; channel++) 
@@ -91,7 +95,6 @@ Repository::is_channel_used_for_sending(int node, int channel, double timeNow) {
 //get_random_channel: Return a random channel between 1 and MAX_CHANNELS
 int 
 Repository::get_random_channel() {
-	
 	int channel=((int)(Random::uniform()*MAX_CHANNELS))+1;		
 	if (channel >= MAX_CHANNELS)
 		channel = MAX_CHANNELS-1;
@@ -110,6 +113,21 @@ int
 Repository::command(int argc, const char*const* argv) {
 }
 
+/*
+ * This gets set by AODV for our transport protocol to poll
+ */
+void
+Repository::set_number_hops(int dst, int num) {
+	repository_num_hops[dst] = num;
+}
+
+/*
+ * this gets called by the transport protocol to calculate slow-down rate
+ */
+int
+Repository::get_number_hops(int dst) {
+	return repository_num_hops[dst];
+}
 
 // Switchable Interface Implementation END
 

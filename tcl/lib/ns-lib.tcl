@@ -2366,8 +2366,30 @@ Simulator instproc prepare-to-stop {} {
 Node/MobileNode instproc node-CR-configure { puMap rep sMap } {
 
 	$self instvar mac_ 
-        $self instvar ragent_
+    $self instvar ragent_
+	
+	set theDataRate [$mac_(0) set dataRate_]
+	$mac_(1) set dataRate_ $theDataRate
+	$mac_(2) set dataRate_ $theDataRate
 
+#802.11b for transmitter?
+$mac_(1) set SlotTime_                0.000020   ;# 20 us
+$mac_(1) set SIFS_                    0.000010   ;# 10 us
+$mac_(1) set PreambleLength_ 72                 ;# 144 bit
+$mac_(1) set PLCPHeaderLength_ 48                ;# 48 bits
+$mac_(1) set PLCPDataRate_              1.0e6      ;# 1 Mbps
+#$mac_(1) set dataRate_                   11.0e6    ;# 11 Mbps
+$mac_(1) set basicRate_                  1.0e6     ;# 1 Mbps
+
+#802.11b for receiver?
+$mac_(2) set SlotTime_                0.000020   ;# 20 us
+$mac_(2) set SIFS_                    0.000010   ;# 10 us
+$mac_(2) set PreambleLength_ 72                 ;# 144 bit
+$mac_(2) set PLCPHeaderLength_ 48                ;# 48 bits
+$mac_(2) set PLCPDataRate_              1.0e6      ;# 1 Mbps
+#$mac_(2) set dataRate_                   11.0e6    ;# 11 Mbps
+$mac_(2) set basicRate_                  1.0e6     ;# 1 Mbps
+	
 	$mac_(2) set-pu-model $puMap
 	$mac_(2) set-spectrum-model $sMap
      

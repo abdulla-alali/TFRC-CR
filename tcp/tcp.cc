@@ -453,7 +453,7 @@ TcpAgent::reset()
 	dupacks_ = 0;
 	curseq_ = 0;
 	set_initial_window();
-
+	print_request_=1;
 	t_seqno_ = 0;
 	maxseq_ = -1;
 	last_ack_ = -1;
@@ -1643,6 +1643,7 @@ void TcpAgent::processQuickStart(Packet *pkt)
             qsh->rate() > 0) {
                 app_rate = (int) ((hdr_qs::rate_to_Bps(qsh->rate()) *
                       (now - tcph->ts_echo())) / (size_ + headersize()));
+                print_request_ = 1;
 		if (print_request_) {
 		  double num1 = hdr_qs::rate_to_Bps(qsh->rate());
 		  double time = now - tcph->ts_echo();

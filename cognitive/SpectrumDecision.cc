@@ -8,6 +8,7 @@
 SpectrumDecision::SpectrumDecision(SpectrumManager *sm) {
 
 	decision_policy_=DECISION_POLICY_ALWAYS_SWITCH;
+	decision_policy_=DECISION_POLICY_NEVER_SWITCH;
 
 	spectrum_policy_=ROUND_ROBIN_SWITCH;
 	
@@ -43,6 +44,12 @@ SpectrumDecision::decideSwitch() {
 
 			switch_decision=true;
 			break;
+
+		// Never make a switch
+		case DECISION_POLICY_NEVER_SWITCH:
+
+			switch_decision=false;
+			break;
 					
 		default:
 			
@@ -63,7 +70,7 @@ SpectrumDecision::decideSpectrum(int current_channel) {
 		
 	int next_channel;
 
-	switch(decision_policy_) {	
+	switch(spectrum_policy_) {
 		
 		// Policy RANDOM_SWITCH: next_channel -> random(1..MAX_CHANNELS)
 		case RANDOM_SWITCH:

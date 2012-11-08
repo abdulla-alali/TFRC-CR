@@ -196,6 +196,8 @@ protected:
 				   period of util_check_intv_ seconds. */
 	// measuring #drops
 	
+	int queue_length;
+
 };
 
 #endif

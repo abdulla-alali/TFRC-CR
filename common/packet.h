@@ -64,6 +64,7 @@
 #define HDR_SCTP(p)     (hdr_sctp::access(p))
 #define HDR_SR(p)       (hdr_sr::access(p))
 #define HDR_TFRC(p)     (hdr_tfrc::access(p))
+#define HDR_TFRC_CR(p)	(hdr_tfrc_cr::access(p))
 #define HDR_TORA(p)     (hdr_tora::access(p))
 #define HDR_IMEP(p)     (hdr_imep::access(p))
 #define HDR_CDIFF(p)    (hdr_cdiff::access(p))  /* chalermak's diffusion*/
@@ -126,6 +127,8 @@ enum packet_t {
 
 	PT_TFRC,
 	PT_TFRC_ACK,
+	PT_TFRC_CR,
+	PT_TFRC_CR_ACK,
 	PT_PING,
 
 	// Diffusion packets - Chalermek
@@ -226,7 +229,9 @@ public:
 		name_[PT_RAP_ACK] = "rap_ack";
 
  		name_[PT_TFRC]= "tcpFriend";
-		name_[PT_TFRC_ACK]= "tcpFriendCtl";
+		name_[PT_TFRC_ACK]= "tcpFriendACK";
+		name_[PT_TFRC_CR]= "tcpFriendCR";
+		name_[PT_TFRC_CR_ACK] = "tcpFriendCRACK";
 		name_[PT_PING]="ping";
 
 	 	/* For diffusion : Chalermek */

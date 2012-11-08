@@ -38,7 +38,8 @@
 #include "ip.h"
 #include "timer-handler.h"
 #include "random.h"
-#include "tfrc.h"
+#include "tfrc-cr.h"
+#include "formula.h"
 
 #define LARGE_DOUBLE 9999999999.99 
 #define SAMLLFLOAT 0.0000001
@@ -53,29 +54,31 @@
 
 #define DEFAULT_NUMSAMPLES  8
 
-#define WALI 1
-#define EWMA 2 
-#define RBPH 3
-#define EBPH 4 
+#define WALI 1 //weighted average loss interval
+#define EWMA 2 //exponentially weighted moving average
+#define RBPH 3 //dynamic history window 1
+#define EBPH 4 //dynamic history window 2
+#define WALI2 5 //weighted average loss in a time interval
 
-class TfrcSinkAgent;
+class Tfrc_CR_SinkAgent;
 
-class TfrcNackTimer : public TimerHandler {
+class Tfrc_CR_NackTimer : public TimerHandler {
 public:
-	TfrcNackTimer(TfrcSinkAgent *a) : TimerHandler() { 
+	Tfrc_CR_NackTimer(Tfrc_CR_SinkAgent *a) : TimerHandler() {
 		a_ = a; 
 	}
 	virtual void expire(Event *e);
 protected:
-	TfrcSinkAgent *a_;
+	Tfrc_CR_SinkAgent *a_;
 };
 
-class TfrcSinkAgent : public Agent {
-	friend class TfrcNackTimer;
+class Tfrc_CR_SinkAgent : public Agent {
+	friend class Tfrc_CR_NackTimer;
 public:
-	TfrcSinkAgent();
+	Tfrc_CR_SinkAgent();
 	void recv(Packet*, Handler*);
 protected:
+	void resetVars(void);
 	void sendpkt(double);
 	void nextpkt(double);
 	double adjust_history(double);
@@ -92,6 +95,7 @@ protected:
 
 	// algo specific
 	double est_loss_WALI();
+	double est_loss_WALI2();
 	void shift_array(int *a, int sz, int defval) ;
 	void shift_array(double *a, int sz, double defval) ;
 	void multiply_array(double *a, int sz, double multiplier);
@@ -107,9 +111,11 @@ protected:
 
 	double est_loss_EBPH() ;
 
+	void calculateStdDev();
+
 	//comman variables
 
-	TfrcNackTimer nack_timer_;
+	Tfrc_CR_NackTimer nack_timer_;
 
 	int psize_;		// size of received packet
 	int fsize_;		// size of large TCP packet, for VoIP mode.
@@ -134,7 +140,7 @@ protected:
 	int numPktsSoFar_;	// Num non-sequential packets so far
 	int PreciseLoss_;       // to estimate loss events more precisely
 	// an option for single-RTT loss intervals
-	int ShortIntervals_ ;	// For calculating loss event rates for short (0 by default)
+	int ShortIntervals_ ;	// For calculating loss event rates for short 
 				//  loss intervals:  "0" for counting a
 				// single loss; "1" for counting the actual
 				// number of losses; "2" for counting at
@@ -143,7 +149,7 @@ protected:
                                 // counted for longer loss intervals;
                                 // >10 for old methods that don't ignore the
                                 // current short loss interval. 
-        int ShortRtts_ ;	// Max num of RTTs in a short interval. (2 by default)
+        int ShortRtts_ ;	// Max num of RTTs in a short interval.
 
 	// these assist in keep track of incming packets and calculate flost_
 	double last_timestamp_; // timestamp of last new, in-order pkt arrival.
@@ -176,7 +182,7 @@ protected:
 	int false_sample; 	// by how much?
 	
 	int algo;		// algo for loss estimation 
-	int discount ;		// emphasize most recent loss interval (1 by default)
+	int discount ;		// emphasize most recent loss interval
 				//  when it is very large
 	int bytes_ ;		// For reporting on received bytes.
 
@@ -189,4 +195,47 @@ protected:
 	double sendrate ;
 	int minlc ; 
 
+	//abdulla: for statistics
+	FILE *pFile_;
+	//abdulla: for packet inter-arrival times
+	double last_arrived;
+	double last_ott;
+	int is_slow_start;
+	//stdDevCalculations
+	int sample_index;
+	double avg_samples;
+	double delta_samples;
+	double m2_samples;
+	double samplesStdDev_;
+	int mostRecentSample_;
+	double flost_;
+	double lastinterval;
+	double percentageDropped;
+	int bin_multiplier_;
 }; 
+
+double b_to_p3(double b, double rtt, double tzero, int psize, int bval)
+{
+	double p, pi, bres;
+	int ctr=0;
+	p=0.5;pi=0.25;
+	while(1) {
+		bres=p_to_b(p,rtt,tzero,psize, bval);
+		/*
+		 * if we're within 5% of the correct value from below, this is OK
+		 * for this purpose.
+		 */
+		if ((bres>0.95*b)&&(bres<1.05*b))
+			return p;
+		if (bres>b) {
+			p+=pi;
+		} else {
+			p-=pi;
+		}
+		pi/=2.0;
+		ctr++;
+		if (ctr>30) {
+			return p;
+		}
+	}
+}

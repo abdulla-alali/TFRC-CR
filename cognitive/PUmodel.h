@@ -65,6 +65,10 @@ class PUmodel : public NsObject {
 		void write_stat(int param);
 		// Check if the tranmission of a CR may cause interference to a PU receiver
 		void update_stat_pu_receiver(int id, double timeNow, double txtime, double x, double y, int channel);
+		//Check if PU is active at that time
+		bool check_active(double timeNow, double ts);
+		//Get next PU off time
+		double get_next_off_time(double timeNow);
 
 	private:
 

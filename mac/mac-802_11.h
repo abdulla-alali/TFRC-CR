@@ -96,6 +96,24 @@ struct frame_control {
 	u_char		fc_to_ds		: 1;
 };
 
+//Timer for channel utilization
+/*class ChanUtil_Timer : public TimerHandler {
+public:
+	ChanUtil_Timer(Mac802_11 *a) : TimerHandler() { a_ = a; }
+	void expire(Event *e);
+protected:
+	Mac802_11 *a_;
+};
+
+//Timer to Calculate channel utilization
+class CalChanUtil_Timer : public TimerHandler {
+public:
+	CalChanUtil_Timer(Mac802_11 *a) : TimerHandler() { a_ = a;}
+	void expire(Event *e);
+protected:
+	Mac802_11 *a_;
+};*/
+
 struct rts_frame {
 	struct frame_control	rf_fc;
 	u_int16_t		rf_duration;
@@ -124,8 +142,8 @@ struct hdr_mac802_11 {
 	struct frame_control	dh_fc;
 	u_int16_t		dh_duration;
 	u_char                  dh_ra[ETHER_ADDR_LEN];
-        u_char                  dh_ta[ETHER_ADDR_LEN];
-        u_char                  dh_3a[ETHER_ADDR_LEN];
+	u_char                  dh_ta[ETHER_ADDR_LEN];
+	u_char                  dh_3a[ETHER_ADDR_LEN];
 	u_int16_t		dh_scontrol;
 	u_char			dh_body[1]; // size of 1 for ANSI compatibility
 };
@@ -146,7 +164,7 @@ public:
 	PHY_MIB(Mac802_11 *parent);
 
 	inline u_int32_t getCWMin() { return(CWMin); }
-        inline u_int32_t getCWMax() { return(CWMax); }
+	inline u_int32_t getCWMax() { return(CWMax); }
 	inline double getSlotTime() { return(SlotTime); }
 	inline double getSIFS() { return(SIFSTime); }
 	inline double getPIFS() { return(SIFSTime + SlotTime); }
@@ -154,33 +172,33 @@ public:
 	inline double getEIFS() {
 		// see (802.11-1999, 9.2.10)
 		return(SIFSTime + getDIFS()
-                       + (8 *  getACKlen())/PLCPDataRate);
+				+ (8 *  getACKlen())/PLCPDataRate);
 	}
 	inline u_int32_t getPreambleLength() { return(PreambleLength); }
 	inline double getPLCPDataRate() { return(PLCPDataRate); }
-	
+
 	inline u_int32_t getPLCPhdrLen() {
 		return((PreambleLength + PLCPHeaderLength) >> 3);
 	}
 
 	inline u_int32_t getHdrLen11() {
 		return(getPLCPhdrLen() + offsetof(struct hdr_mac802_11, dh_body[0])
-                       + ETHER_FCS_LEN);
+				+ ETHER_FCS_LEN);
 	}
-	
+
 	inline u_int32_t getRTSlen() {
 		return(getPLCPhdrLen() + sizeof(struct rts_frame));
 	}
-	
+
 	inline u_int32_t getCTSlen() {
 		return(getPLCPhdrLen() + sizeof(struct cts_frame));
 	}
-	
+
 	inline u_int32_t getACKlen() {
 		return(getPLCPhdrLen() + sizeof(struct ack_frame));
 	}
 
- private:
+private:
 
 
 
@@ -216,10 +234,10 @@ public:
 	u_int32_t	FailedCount;	
 	u_int32_t	RTSFailureCount;
 	u_int32_t	ACKFailureCount;
- public:
-       inline u_int32_t getRTSThreshold() { return(RTSThreshold);}
-       inline u_int32_t getShortRetryLimit() { return(ShortRetryLimit);}
-       inline u_int32_t getLongRetryLimit() { return(LongRetryLimit);}
+public:
+	inline u_int32_t getRTSThreshold() { return(RTSThreshold);}
+	inline u_int32_t getShortRetryLimit() { return(ShortRetryLimit);}
+	inline u_int32_t getLongRetryLimit() { return(LongRetryLimit);}
 };
 
 
@@ -247,6 +265,10 @@ class Mac802_11 : public Mac {
 	friend class RxTimer;
 	friend class TxTimer;
 
+	//channel utilization
+	//friend class ChanUtil_Timer;
+	//friend class CalChanUtil_Timer;
+
 	friend class SwitchQueueTimer;
 	friend class SwitchChannelTimer;
 
@@ -256,14 +278,24 @@ public:
 	inline int	hdr_dst(char* hdr, int dst = -2);
 	inline int	hdr_src(char* hdr, int src = -2);
 	inline int	hdr_type(char* hdr, u_int16_t type = 0);
-	
+
 	inline int bss_id() { return bss_id_; }
-	
+
 	// Added by Sushmita to support event tracing
-        void trace_event(char *, Packet *);
-        EventTrace *et_;
-	
-	
+	void trace_event(char *, Packet *);
+	EventTrace *et_;
+
+	//Channel utilization
+	//FILE *fp;
+	//ChanUtil_Timer ChanUtil_Timer_;
+	//CalChanUtil_Timer CalChanUtil_Timer_;
+	//void ChanUtil_Calculate(); //function for recording channel utilization
+	//void CalChanUtil_Calculate(); //function for calculating channel utilization
+	//void increaseChanUtil() { chanutilcount++; }
+	//void resetChanUtil() { chanutilcount=0; }
+	//double getChanUtil() { return chanutilcount; }
+	//end channel utilization
+
 	// CRAHNs Model START
 	// @author:  Marco Di Felice	
 
@@ -273,7 +305,7 @@ public:
 	void notifyUpperLayer(int channel);
 	// This method should be public
 	inline void checkBackoffTimer(void);
-	
+
 	// CRAHNs Model END
 	// @author:  Marco Di Felice	
 
@@ -338,19 +370,19 @@ private:
 
 	inline int initialized() {	
 		return (cache_ && logtarget_
-                        && Mac::initialized());
+				&& Mac::initialized());
 	}
 
 	inline void mac_log(Packet *p) {
-                logtarget_->recv(p, (Handler*) 0);
-        }
+		logtarget_->recv(p, (Handler*) 0);
+	}
 
 	double txtime(Packet *p);
 	double txtime(double psz, double drt);
 	double txtime(int bytes) { /* clobber inherited txtime() */ abort(); return 0;}
 
 	inline void transmit(Packet *p, double timeout);
-	
+
 	inline void postBackoff(int pri);
 	inline void setRxState(MacState newState);
 	inline void setTxState(MacState newState);
@@ -381,21 +413,25 @@ private:
 
 protected:
 	PHY_MIB         phymib_;
-        MAC_MIB         macmib_;
+	MAC_MIB         macmib_;
 
-       /* the macaddr of my AP in BSS mode; for IBSS mode
-        * this is set to a reserved value IBSS_ID - the
-        * MAC_BROADCAST reserved value can be used for this
-        * purpose
-        */
-       int     bss_id_;
-       enum    {IBSS_ID=MAC_BROADCAST};
+	/* the macaddr of my AP in BSS mode; for IBSS mode
+	 * this is set to a reserved value IBSS_ID - the
+	 * MAC_BROADCAST reserved value can be used for this
+	 * purpose
+	 */
+	int     bss_id_;
+	enum    {IBSS_ID=MAC_BROADCAST};
 
 
 private:
 	double		basicRate_;
- 	double		dataRate_;
-	
+	double		dataRate_;
+
+
+	//channel utilization
+	//double chanutilcount;
+
 	/*
 	 * Mac Timers
 	 */
@@ -439,21 +475,21 @@ private:
 	u_int16_t	sta_seqno_;	// next seqno that I'll use
 	int		cache_node_count_;
 	Host		*cache_;
-	
-		
+
+
 
 
 
 	/*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- 	 * SWITCHABLE INTERFACES MAC
- 	 * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */ 	
+	 * SWITCHABLE INTERFACES MAC
+	 * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */
 
 	// CRAHNs Model START
 	// @author:  Marco Di Felice	
 
 	// Cross-layer Repository for information sharing
 	Repository 		*repository_;	
-	
+
 	// Actual channel on which the switchable interface is tuned
 	int			switching_channel_;
 	// Next channel to switch on
@@ -468,16 +504,16 @@ private:
 	int			switchable_policy_;
 	// Available policy for queue switching
 	// Round robin among all the available channels
-	#define ROUND_ROBIN_ALL_CHANNELS 	0
+#define ROUND_ROBIN_ALL_CHANNELS 	0
 	// Round robin among the active channels
-	#define ROUND_ROBIN_ACTIVE_CHANNELS	1
-	
+#define ROUND_ROBIN_ACTIVE_CHANNELS	1
+
 	// Unable/disable model components
 	// Enable verbose mode
-	#define MAX_VERBOSE
+#define MAX_VERBOSE
 	// Enable the model of channel switching
-	#define CHANNEL_SWITCHING_MODEL
-	
+#define CHANNEL_SWITCHING_MODEL
+
 	// Timers
 	// Timer for queue switching
 	SwitchQueueTimer 	mhQueue_;
@@ -489,11 +525,11 @@ private:
 	void 			switchchannelHandler();
 	// Callback Function 
 	Handler* 		callbackQueue_;
-	
-	
+
+
 	// Cognitive Radio Environment
 	// Enable the modelling of Tx errors caused by (i) channel errors and/or (ii) PU interference
-	#define PU_ERROR_MODEL
+#define PU_ERROR_MODEL
 	// Primary User Activity model
 	PUmodel*		pumodel_;
 	// Spectrum Manager reference

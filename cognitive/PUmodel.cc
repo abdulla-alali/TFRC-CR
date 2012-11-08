@@ -84,7 +84,7 @@ PUmodel::read_data(char* dir) {
 
 
 		if (IO_DEBUG)
-			printf("[READING MAP FILE] #PU Location: %d %f %f #PU Receiver: %f %f ALPHA: %e BETA: %e TX RANGE: %f\n",channel,x,y,x2,y2,alpha,beta,range); 
+			printf("[READING MAP FILE] #PU Location: channel: %d x=%f y=%f #PU Receiver: x=%f y=%f ALPHA: %e BETA: %e TX RANGE: %f\n",channel,x,y,x2,y2,alpha,beta,range);
 
 
 		pu_data[i].main_channel=channel;
@@ -117,10 +117,10 @@ PUmodel::read_data(char* dir) {
 		}
 
 		if (IO_DEBUG)
-			printf("[READING MAP FILE] #PU data: %d \n",number); 
+			printf("[READING MAP FILE] #PU ON times: %d \n",number); 
 	
 		if (number>MAX_PU_DATA_ENTRY) {
-			printf(" ERROR. Too many PU DATA in the file. Max allowed is %d %d\n", MAX_PU_DATA_ENTRY,number);
+			printf(" ERROR. Too many PU DATA ON times in the file. Max allowed is %d %d\n", MAX_PU_DATA_ENTRY,number);
                 	exit(0);
 
 		}
@@ -167,9 +167,8 @@ PUmodel::is_PU_active(double timeNow, double ts, double x, double y, int channel
 		if ((pu_data[i].main_channel==channel) && (distance(x,y,i) <=pu_data[i].radius))
 			active=check_active(timeNow,ts,i);
 		
-		if (active) 
+		if (active)
 			return true;
-		
 		
 	}
 	
@@ -181,7 +180,7 @@ PUmodel::is_PU_active(double timeNow, double ts, double x, double y, int channel
 
 
 
-// check:active: Check if a PU is transmitting in the intervale [timeNow, timeNow + ts]
+// check:active: Check if a PU is transmitting in the interval [timeNow, timeNow + ts]
 bool
 PUmodel::check_active(double timeNow, double ts, int channel) {
 
@@ -202,7 +201,7 @@ PUmodel::check_active(double timeNow, double ts, int channel) {
 	 	}
 
 		// If there is on overlapping, then jump out from the cycle
-		if (active || pu_data[channel].arrival_time[i]>endTime)
+		if (active || pu_data[channel].arrival_time[i]>endTime) 
         	              i=number; 
 	}
 	
@@ -212,6 +211,85 @@ PUmodel::check_active(double timeNow, double ts, int channel) {
 
 
 
+/*
+ * this function checks if PU is active in a time period. This is useful for our TFRC implementation
+ * where we assume that the database returns only PUs that are affecting the chain
+ */
+bool
+PUmodel::check_active(double timeNow, double ts) {
+
+
+	double endTime=timeNow+ts;
+	double active=false;
+
+	for (int j=0; j<number_pu_; j++) {
+		for (int i=0; i<pu_data[j].number_data; i++) {
+
+			// Check if there is an overlapping with the current PU activity
+			if( (pu_data[j].arrival_time[i]>=timeNow && pu_data[j].departure_time[i]>=endTime && pu_data[j].arrival_time[i]<=endTime) || (pu_data[j].arrival_time[i]<=timeNow && pu_data[j].departure_time[i]>=endTime) ||
+					(pu_data[j].arrival_time[i]<=timeNow && pu_data[j].departure_time[i]>=timeNow && pu_data[j].departure_time[i]<=endTime)) {
+
+				active=true;
+				pu_data[j].detected[i]=true;
+
+			}
+
+			// If there is on overlapping, then jump out from the cycle
+			if (active) {
+				i=pu_data[j].number_data;
+				j=number_pu_;
+			}
+			if (pu_data[j].arrival_time[i]>endTime) {
+				i=pu_data[j].number_data;
+			}
+		}
+	}
+
+	return(active);
+
+}
+
+/*
+ * Get the next time the PU goes off.
+ * This is needed for our TFRC protocol so that it can start sending immediately at this time
+ * returns -1 if there is no PU currently
+ */
+double
+PUmodel::get_next_off_time(double timeNow) {
+
+
+	double endTime=timeNow+0.001;
+	double active=false;
+	double timeOff = 0;
+
+	for (int j=0; j<number_pu_; j++) {
+		for (int i=0; i<pu_data[j].number_data; i++) {
+
+			// Check if there is an overlapping with the current PU activity
+			if( (pu_data[j].arrival_time[i]>=timeNow && pu_data[j].departure_time[i]>=endTime && pu_data[j].arrival_time[i]<=endTime) || (pu_data[j].arrival_time[i]<=timeNow && pu_data[j].departure_time[i]>=endTime) ||
+					(pu_data[j].arrival_time[i]<=timeNow && pu_data[j].departure_time[i]>=timeNow && pu_data[j].departure_time[i]<=endTime)) {
+
+				active=true;
+				pu_data[j].detected[i]=true;
+
+			}
+
+			// If there is on overlapping, then jump out from the cycle
+			if (active) {
+				timeOff = pu_data[j].departure_time[i];
+				printf("timeoff: %f i=%i and j=%i\n", pu_data[j].departure_time[i], i, j);
+				i=pu_data[j].number_data;
+				j=number_pu_;
+			}
+			if (pu_data[j].arrival_time[i]>endTime) {
+				i=pu_data[j].number_data;
+			}
+		}
+	}
+
+	return(timeOff);
+
+}
 
 
 /**********************************************************/

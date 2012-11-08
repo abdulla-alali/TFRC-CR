@@ -254,7 +254,6 @@ void
 BackoffTimer::pause()
 {
 	Scheduler &s = Scheduler::instance();
-
 	//the caculation below make validation pass for linux though it
 	// looks dummy
 

@@ -10,6 +10,8 @@
 #define DECISION_POLICY_ALWAYS_SWITCH 		0
 // Policy 1: Switch to a new channel, with probability THRESHOLD_SWITCH
 #define DECISION_POLICY_PROBABILISTIC_SWITCH 	1
+// Policy 2: Never switch!
+#define DECISION_POLICY_NEVER_SWITCH 2
 
 // Switching threshold, for policy 1
 #define THRESHOLD_SWITCH 	0.8

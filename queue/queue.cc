@@ -38,6 +38,7 @@ static const char rcsid[] =
 #endif
 
 #include "queue.h"
+#include <mac-802_11.h>
 #include <math.h>
 #include <stdio.h>
 
@@ -113,6 +114,7 @@ Queue::Queue() : Connector(), blocked_(0), unblock_on_resume_(1), qh_(*this),
 	bind_bool("unblock_on_resume_", &unblock_on_resume_);
 	bind("util_check_intv_", &util_check_intv_);
 	bind("util_records_", &util_records_);
+	bind("queue_length", &queue_length);
 
 	if (util_records_ > 0) {
 		util_buf_ = new double[util_records_];
@@ -132,12 +134,24 @@ Queue::Queue() : Connector(), blocked_(0), unblock_on_resume_(1), qh_(*this),
 	current_tuned_channel_=-1;
 	// CRAHNs Model END
 
+	queue_length=0;
+
 }
 
 
 
 void Queue::recv(Packet* p, Handler*)
 {
+
+
+	struct hdr_mac802_11* dh = HDR_MAC802_11(p);
+	queue_length=pq_->length();
+	if (pq_->length()>2)
+		printf("%f - from %i to %i - len before dequeue %i\n", Scheduler::instance().clock(),
+				(ETHER_ADDR(dh->dh_ta)/MAX_RADIO),
+				(ETHER_ADDR(dh->dh_ra)/MAX_RADIO),
+				pq_->length());
+
 	double now = Scheduler::instance().clock();
 
 
@@ -328,7 +342,6 @@ Queue::resume(int channel)
 // dequeuePacket_from_channel: deque a packet which has to be sent on a specific channel
 Packet* PacketQueue::dequePacket_from_channel(int channel)
 {
-
 
 	for (Packet *pp= 0, *p= head_; p; pp= p, p= p->next_) {
 		if (HDR_CMN(p)->channel_ == channel) {

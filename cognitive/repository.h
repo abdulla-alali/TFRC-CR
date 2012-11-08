@@ -10,7 +10,7 @@
 
 
 // Defines the time a node spends on each queue
-#define QUEUE_UTILIZATION_INTERVAL 	1.0
+#define QUEUE_UTILIZATION_INTERVAL 	0.2
 // Defines the channel switching delay
 #define SWITCHING_DELAY			0.001
 // Defines the TIMEOUT_ALIVE to check wheter a node is active on a given channel or not
@@ -28,8 +28,9 @@
 
 // Channe/Radio Information 
 #define MAX_RADIO	3
-#define	MAX_CHANNELS 	11
+#define	MAX_CHANNELS 	11 //#modify to accomodate changes (he says dont modify, why ?)
 #define CONTROL_CHANNEL 0
+#define MAX_HOPS_STORE 40 //max number of hops to store
 
 
 #define SENSING_VERBOSE_MODE
@@ -59,8 +60,6 @@ struct repository_entry_send {
 
 
 
-
-
 // Cross-Layer Repository class
 class Repository : public NsObject {
 
@@ -80,6 +79,9 @@ class Repository : public NsObject {
 		 void update_send_channel(int node, int channel, double time);
 		 bool is_channel_used_for_sending(int node, int channel, double timeNow);
 
+		 void set_number_hops(int dst, int num);
+		 int get_number_hops(int dst);
+
 	
 	private:
 
@@ -87,6 +89,8 @@ class Repository : public NsObject {
 		repository_entry_recv repository_table[MAX_NODES];
 		// Sender Channel table: repository_table_sender[i][j] contains the information (active/time) for sending node i and channel j
 		 repository_entry_send repository_table_sender[MAX_NODES][MAX_CHANNELS];
+		 //to each destination, we have number of hops
+		 int repository_num_hops[MAX_HOPS_STORE];
 		// Returns a random channel between 1 and MAX_CHANNELS
 		int get_random_channel();
 		

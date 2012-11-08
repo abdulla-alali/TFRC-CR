@@ -41,6 +41,7 @@ The AODV code developed by the CMU/MONARCH group was optimized and tuned by Sami
 
 //#define DEBUG
 //#define ERROR
+#define CHANNEL_DEBUG 1
 
 #ifdef DEBUG
 static int extra_route_reply = 0;
@@ -476,6 +477,7 @@ void
 AODV::rt_update(aodv_rt_entry *rt, u_int32_t seqnum, u_int16_t metric,
 	       	nsaddr_t nexthop, double expire_time) {
 
+	repository_->set_number_hops(rt->rt_dst, metric);
      rt->rt_seqno = seqnum;
      rt->rt_hops = metric;
      rt->rt_flags = RTF_UP;
@@ -1446,7 +1448,6 @@ void
 AODV::recvHello(Packet *p) {
 //struct hdr_ip *ih = HDR_IP(p);
 struct hdr_aodv_hello *rp = HDR_AODV_HELLO(p);
-AODV_Neighbor *nb;
  
  // CRAHNs Model START
  // @author:  Marco Di Felice
@@ -1490,6 +1491,7 @@ AODV_Neighbor *nb;
 // Insert a 1-hop or 2-hop neighbour in the Neighbour Table of AODV
 void 
 AODV::update_neighbourhood(int id, int channel, int hop) {
+	//printf("update neighborhood called\n");
  AODV_Neighbor *nb;
  nb = nb_lookup(id);
 
@@ -1622,7 +1624,7 @@ AODV::set_receiver_channel() {
 
 				#ifdef CHANNEL_DEBUG
 				printf("[ CHANNEL SELECTION ] NODE: %d CHANNEL: %d \n",index,feasible_channels[channel]);
-				#endif			
+				#endif
 				
 				// Update global data structure with channel decision
 				repository_->set_recv_channel(index,feasible_channels[channel]);
