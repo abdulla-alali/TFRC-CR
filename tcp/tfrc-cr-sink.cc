@@ -131,7 +131,7 @@ Tfrc_CR_SinkAgent::Tfrc_CR_SinkAgent() : Agent(PT_TFRC_CR_ACK), nack_timer_(this
 	// used only bu RBPH
 	sendrate = 0 ; // current send rate
 
-	pFile_ = fopen("receiverdump.txt", "w");
+	//pFile_ = fopen("receiverdump.txt", "w");
 	last_arrived = 0;
 	last_ott = 0;
 	is_slow_start = 0;
@@ -555,7 +555,7 @@ void Tfrc_CR_SinkAgent::sendpkt(double p)
 		else 
 			tfrc_ackh->true_loss = 1.0 * 
 			    total_losses_/(total_received_+total_dropped_);
-		fprintf (pFile_, "%5.2f frequency_of_loss_indication: %f rate_since_last_report: %f NumFeedback: %f losses: %i\n", now, tfrc_ackh->flost, tfrc_ackh->rate_since_last_report, tfrc_ackh->NumFeedback_, losses_since_last_report);
+		//fprintf (pFile_, "%5.2f frequency_of_loss_indication: %f rate_since_last_report: %f NumFeedback: %f losses: %i\n", now, tfrc_ackh->flost, tfrc_ackh->rate_since_last_report, tfrc_ackh->NumFeedback_, losses_since_last_report);
 		last_report_sent = now; 
 		rcvd_since_last_report = 0;
 		losses_since_last_report = 0;

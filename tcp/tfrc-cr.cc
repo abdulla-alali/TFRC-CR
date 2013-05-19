@@ -209,7 +209,7 @@ void Tfrc_CR_Agent::start()
 	printStatus_=1;
 	infoDumpDebug_ = 0; /*Abdulla*/
 	/*Abdulla*/
-	pFile = fopen("senderdump.txt", "w");
+	//pFile = fopen("senderdump.txt", "w");
 	rate_at_pause_time_=0;
 	pausedPU_ = false;
 	puDoubleCheckAllowed_ = true;
@@ -343,7 +343,7 @@ void Tfrc_CR_Agent::stop()
 	send_timer_.force_cancel();
 
 	/*Abdulla*/
-	fclose(pFile);
+	//fclose(pFile);
 }
 
 void Tfrc_CR_Agent::nextpkt()
@@ -866,11 +866,13 @@ void Tfrc_CR_Agent::reduce_rate_on_no_feedback()
 		// all_idle_: the sender has been datalimited since the 
 		//    timer was set
 		//  Don't reduce rate below rate_init_ * size_/rtt_.
+		if (rtt_==0) return;
 		if (rate_ > 2.0 * rate_init_ * size_/rtt_ ) {
 			rate_*=0.5;
 		}
 	} else if ((datalimited_ || all_idle_) && rate_init_option_ == 2) {
 		// Don't reduce rate below the RFC3390 rate.
+		if (rtt_==0) return;
 		if (rate_ > 2.0 * rfc3390(size_) * size_/rtt_ ) {
 			rate_*=0.5;
 		} else if ( rate_ > rfc3390(size_) * size_/rtt_ ) {
@@ -978,7 +980,7 @@ void Tfrc_CR_CheckPUOff::expire(Event *) {
 			a_->pausedPU_at_time_=Scheduler::instance().clock();
 			a_->pausedPU_=true;
 			if (a_->avgRTT_==0) a_->rate_=100;
-			else a_->rate_=a_->size_/(6*a_->avgRTT_);
+			else a_->rate_=a_->size_/(a_->avgRTT_+(4*sqrt(a_->m2RTT_/a_->indexRTT_))); //avgRTT_+(4*sqrt(m2RTT_/indexRTT_))
 			printf("%f - reduced rate to %f\n", a_->pausedPU_at_time_, a_->rate_);
 
 		}
