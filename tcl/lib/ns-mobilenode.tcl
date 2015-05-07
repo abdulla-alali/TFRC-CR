@@ -186,6 +186,14 @@ Node/MobileNode instproc add-target { agent port } {
 		[$self set imep_(0)] rtagent $agent
 	}
 	
+	# Begin Marcello Caleffi, <marcello.caleffi@unina.it>, 08-04-01
+	# Special processing for AOMDV
+	set aomdvonly [string first "AOMDV" [$agent info class]] 
+	if {$aomdvonly != -1 } {
+		$agent if-queue [$self set ifq_(0)]   ;# ifq between LL and MAC
+	}
+	# End Marcello Caleffi, <marcello.caleffi@unina.it>, 08-04-01
+	
 	# Special processing for AODV
 	set aodvonly [string first "AODV" [$agent info class]] 
 	if {$aodvonly != -1 } {
@@ -265,12 +273,26 @@ Node/MobileNode instproc add-target-rtagent { agent port } {
 		# Send Target
 		#
 		if {$newapi != ""} {
-			set sndT [$self mobility-trace Send "RTR"]
+			#set sndT [$self mobility-trace Send "RTR"]
+			#Modified by mdf for switchable interface
+			set sndT1 [$self mobility-trace Send "RTR"]
+			set sndT2 [$self mobility-trace Send "RTR"]
+			set sndT3 [$self mobility-trace Send "RTR"]
 		} else {
-			set sndT [cmu-trace Send "RTR" $self]
+		#	set sndT [cmu-trace Send "RTR" $self]
+			#Modified by mdf for switchable interface
+			set sndT1 [cmu-trace Send "RTR" $self]
+			set sndT2 [cmu-trace Send "RTR" $self]
+			set sndT3 [cmu-trace Send "RTR" $self]
+	
 		}
 		if { $namfp != "" } {
-			$sndT namattach $namfp
+			#Modified by mdf for switchable interface
+			#$sndT namattach $namfp
+			$sndT1 namattach $namfp
+			$sndT2 namattach $namfp
+			$sndT3 namattach $namfp
+
 		}
 		if { $newapi == "ON" } {
 			$agent target $imep_(0)
@@ -283,9 +305,17 @@ Node/MobileNode instproc add-target-rtagent { agent port } {
 				$agent target $sndT2
 			}
 		} else {  ;#  no IMEP
-			$agent target $sndT
+			#$agent target $sndT
+			#Modified by felicepizzi for LB-NET
+			 $agent down-target-1 $sndT1
+			 $agent down-target-2 $sndT2
+			 $agent down-target-3 $sndT3
 		}
-		$sndT target [$self set ll_(0)]
+		#Modified by felicepizzi for LB-NET
+		#$sndT target [$self set ll_(0)]
+		 $sndT1 target [$self set ll_(0)]
+		 $sndT2 target [$self set ll_(1)]
+		 $sndT3 target [$self set ll_(2)]
 		#
 		# Recv Target
 		#
@@ -330,7 +360,11 @@ Node/MobileNode instproc add-target-rtagent { agent port } {
 			$imep_(0) sendtarget [$self set ll_(0)]
 			
 		} else {  ;#  no IMEP
-			$agent target [$self set ll_(0)]
+		#	$agent target [$self set ll_(0)]	
+			#Modified by felicepizzi for LB-NET
+			$agent down-target-1 [$self set ll_(0)]
+			$agent down-target-2 [$self set ll_(1)]
+			$agent down-target-3 [$self set ll_(2)]
 		}    
 		#
 		# Recv Target
@@ -526,7 +560,9 @@ Node/MobileNode instproc add-interface { channel pmodel lltype mactype qtype qle
         # List-based improvement
 	# For nodes talking to multiple channels this should
 	# be called multiple times for each channel
-	$channel add-node $self		
+	if { $nifs_ == 1 } {
+ 		$channel add-node $self		
+	}
 
 	# let topo keep handle of channel
 	$topo channel $channel

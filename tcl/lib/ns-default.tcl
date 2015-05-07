@@ -1358,5 +1358,6 @@ Queue set util_check_intv_ 0.2 ;	# Changed from 1 to 0.2, 2/25/05.
 Queue set util_records_ 5 ; 		# Changed from 0 to 5, 2/25/05.
 
 # Quick Start definitions end here
+CrossLayerRepository set debug_ false
 
 Delayer set debug_ false

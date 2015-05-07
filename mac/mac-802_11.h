@@ -49,6 +49,16 @@
 #include <math.h>
 #include <stddef.h>
 
+
+#include <common/event.h>
+
+
+#include "cognitive/SpectrumManager.h"
+#include "cognitive/SpectrumData.h"
+#include "cognitive/PUmodel.h"
+#include "cognitive/repository.h"
+
+
 class EventTrace;
 
 #define GET_ETHER_TYPE(x)		GET2BYTE((x))
@@ -236,6 +246,10 @@ class Mac802_11 : public Mac {
 	friend class NavTimer;
 	friend class RxTimer;
 	friend class TxTimer;
+
+	friend class SwitchQueueTimer;
+	friend class SwitchChannelTimer;
+
 public:
 	Mac802_11();
 	void		recv(Packet *p, Handler *h);
@@ -248,6 +262,21 @@ public:
 	// Added by Sushmita to support event tracing
         void trace_event(char *, Packet *);
         EventTrace *et_;
+	
+	
+	// CRAHNs Model START
+	// @author:  Marco Di Felice	
+
+	// Load the spectrum characteristics for the actual channel (bandwidth/PER/...)
+	void load_spectrum(spectrum_entry_t spectrum);	
+	// Notify the detection of a PU on the actual channel
+	void notifyUpperLayer(int channel);
+	// This method should be public
+	inline void checkBackoffTimer(void);
+	
+	// CRAHNs Model END
+	// @author:  Marco Di Felice	
+
 
 protected:
 	void	backoffHandler(void);
@@ -321,7 +350,7 @@ private:
 	double txtime(int bytes) { /* clobber inherited txtime() */ abort(); return 0;}
 
 	inline void transmit(Packet *p, double timeout);
-	inline void checkBackoffTimer(void);
+	
 	inline void postBackoff(int pri);
 	inline void setRxState(MacState newState);
 	inline void setTxState(MacState newState);
@@ -410,7 +439,78 @@ private:
 	u_int16_t	sta_seqno_;	// next seqno that I'll use
 	int		cache_node_count_;
 	Host		*cache_;
+	
+		
+
+
+
+	/*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 	 * SWITCHABLE INTERFACES MAC
+ 	 * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */ 	
+
+	// CRAHNs Model START
+	// @author:  Marco Di Felice	
+
+	// Cross-layer Repository for information sharing
+	Repository 		*repository_;	
+	
+	// Actual channel on which the switchable interface is tuned
+	int			switching_channel_;
+	// Next channel to switch on
+	int			new_switchable_channel_;
+	// Boolean Flag, used to start the SwitchingQueueTimer
+	bool			first_tx_attempt_;
+	// Booolean Flag (true if the node is performing channel switching
+	bool			channel_switching_;
+
+
+	// Policy for queue switching
+	int			switchable_policy_;
+	// Available policy for queue switching
+	// Round robin among all the available channels
+	#define ROUND_ROBIN_ALL_CHANNELS 	0
+	// Round robin among the active channels
+	#define ROUND_ROBIN_ACTIVE_CHANNELS	1
+	
+	// Unable/disable model components
+	// Enable verbose mode
+	#define MAX_VERBOSE
+	// Enable the model of channel switching
+	#define CHANNEL_SWITCHING_MODEL
+	
+	// Timers
+	// Timer for queue switching
+	SwitchQueueTimer 	mhQueue_;
+	// Timer for channel switching delay
+	SwitchChannelTimer 	mhSwitch_;
+	// Handler for SwitchQueueTimer
+	void 			switchqueueHandler();
+	// Handler for SwitchChannelTimer
+	void 			switchchannelHandler();
+	// Callback Function 
+	Handler* 		callbackQueue_;
+	
+	
+	// Cognitive Radio Environment
+	// Enable the modelling of Tx errors caused by (i) channel errors and/or (ii) PU interference
+	#define PU_ERROR_MODEL
+	// Primary User Activity model
+	PUmodel*		pumodel_;
+	// Spectrum Manager reference
+	SpectrumManager 	*sm_;
+	// Loader of spectrum data characteristics
+	SpectrumData    	*sd_;	
+	// Packet Error Rate (PER) of the current channel
+	double			per_;
+
+
+	// CRAHNs Model END
+
+
 };
+
+
+
 
 #endif /* __mac_80211_h__ */
 

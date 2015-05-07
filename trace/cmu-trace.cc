@@ -230,16 +230,17 @@ CMUTrace::format_mac_common(Packet *p, const char *why, int offset)
         x = 0.0, y = 0.0, z = 0.0;
         node_->getLoc(&x, &y, &z);
 #endif
-
+	int channel=ch->channel_;
 	sprintf(pt_->buffer() + offset,
 #ifdef LOG_POSITION
-		"%c %.9f %d (%6.2f %6.2f) %3s %4s %d %s %d ",
+		"%c %.9f %d  %d (%6.2f %6.2f) %3s %4s %d %s %d ",
 #else
-		"%c %.9f _%d_ %3s %4s %d %s %d",
+		"%c %.9f _%d_ %d %3s %4s %d %s %d",
 #endif
 		op,
 		Scheduler::instance().clock(),
-                src_,                           // this node
+        src_,
+		channel,                       // this node
 #ifdef LOG_POSITION
                 x,
                 y,

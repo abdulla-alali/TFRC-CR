@@ -40,7 +40,15 @@
 #include "connector.h"
 #include "packet.h"
 #include "ip.h"
+
+#include "common/event.h"
+
 class Packet;
+class Queue;
+
+
+
+
 
 class PacketQueue : public TclObject {
 public:
@@ -82,6 +90,13 @@ public:
         Packet* head() { return head_; }
 	Packet* tail() { return tail_; }
 	// MONARCH EXTNS
+	
+
+	// CRAHNs Model START
+	// @author: Marco Di Felice
+	Packet* dequePacket_from_channel(int channel);
+	// CRAHNs Model END
+
 	virtual inline void enqueHead(Packet* p) {
 	        if (!head_) tail_ = p;
 	        p->next_ = head_;
@@ -126,7 +141,15 @@ public:
 	virtual void recv(Packet*, Handler*);
 	virtual void updateStats(int queuesize); 
 	void resume();
+
 	
+	// CRAHNs Model START
+	// @author: Marco Di Felice
+	void resume(int channel);
+	int current_tuned_channel_;
+	// CRAHNs Model END
+
+
 	int blocked() const { return (blocked_ == 1); }
 	void unblock() { blocked_ = 0; }
 	void block() { blocked_ = 1; }
@@ -142,6 +165,7 @@ public:
 	   Returns the maximum of recent measurements stored in util_buf_*/
 	double peak_utilization(void);
 	virtual ~Queue();
+
 protected:
 	Queue();
 	void reset();

@@ -42,6 +42,7 @@ The AODV code developed by the CMU/MONARCH group was optimized and tuned by Sami
 #include <aodv/aodv_rtable.h>
 #include <aodv/aodv_rqueue.h>
 #include <classifier/classifier-port.h>
+#include <cognitive/repository.h>
 
 /*
   Allows local repair of routes 
@@ -73,10 +74,10 @@ The AODV code developed by the CMU/MONARCH group was optimized and tuned by Sami
 
 class AODV;
 
-#define MY_ROUTE_TIMEOUT        10                      	// 100 seconds
-#define ACTIVE_ROUTE_TIMEOUT    10				// 50 seconds
-#define REV_ROUTE_LIFE          6				// 5  seconds
-#define BCAST_ID_SAVE           6				// 3 seconds
+#define MY_ROUTE_TIMEOUT        1000                      	// 100 seconds
+#define ACTIVE_ROUTE_TIMEOUT    1000				// 50 seconds
+#define REV_ROUTE_LIFE          6000				// 5  seconds
+#define BCAST_ID_SAVE           6000				// 3 seconds
 
 
 // No. of times to do network-wide search before timing out for 
@@ -324,6 +325,57 @@ class AODV: public Agent {
 	/* for passing packets up to agents */
 	PortClassifier *dmux_;
 
+
+	// CRAHNs Model START
+	// @author:  Marco Di Felice	
+
+	
+
+	// Channel Allocation policy
+	#define MIN_INTERFERENCE_POLICY 0
+	
+	// Threhold regulating channel switching convenience in the MIN_INTERFERENCE_POLICY
+	#define CONVENIENCE_THRESHOLD 1
+
+	// Channel Allocation timer
+	// Every HELLO_REFRESH_TIMER seconds, a Mesh node performs channel decision and broadcasts an HELLO message
+	#define HELLO_REFRESH_TIMER 500
+
+	// Channel Allocation Threshold
+	// A node is considered active if it forwards at least PACKET_ACTIVE_THRESHOLD data packets in an HELLO_REFRESH_TIMER interval
+	#define PACKET_ACTIVE_THRESHOLD 10
+	#define HELLO_MSG_OPTIMIZATION
+
+	// Comment/ Uncomment this line if you want to enable protocol debugging
+	//#define CHANNEL_DEBUG 
+
+	// Pointers to downlayers
+	NsObject* 	downtarget_[MAX_RADIO];
+	// Cross-Layer Information Sharing Repository
+	Repository 	*repository_;
+	// Channel Allocation scheme
+	int		channel_allocation_mode_;
+	int 		num_packets_sent_; 
+
+	// Number of interferers on each channel	
+	int		num_recv_channels_[MAX_CHANNELS];
+
+	// Method to decide the receiving channel 
+	// Set the receiving channel
+	void		set_receiver_channel();
+	// Compute the # of interferers on a given channel, at 2-hop of distance
+	void		compute_receivers_for_channels();
+	// Return the channel with less interferers
+	int 		get_less_interfered_channel();
+	// Update the list of neighbours, at 1 or 2 hops of distance
+	void		update_neighbourhood(int id, int channel, int hop);
+	// Receive the notification of spectrum handoff from the MAC layer; inform the neighbouring nodes about the selection of the new channel
+	void		recvNotification(Packet *p);
+	// CRAHNs Model END
+	// @author:  Marco Di Felice
+
+
 };
+
 
 #endif /* __aodv_h__ */

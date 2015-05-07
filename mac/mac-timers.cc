@@ -308,3 +308,45 @@ BackoffTimer::resume(double difs)
 }
 
 
+
+// CRAHNs Model START
+// @author:  Marco Di Felice
+
+
+/* ======================================================================
+   Switch Queue Timer
+   ====================================================================== */
+
+void    
+SwitchQueueTimer::handle(Event *)
+{       
+	busy_ = 0;
+	paused_ = 0;
+	stime = 0.0;
+	rtime = 0.0;
+
+
+
+	mac->switchqueueHandler();
+}
+
+
+/* ======================================================================
+   Switch Channel Timer
+   ====================================================================== */
+
+void    
+SwitchChannelTimer::handle(Event *)
+{       
+	busy_ = 0;
+	paused_ = 0;
+	stime = 0.0;
+	rtime = 0.0;
+
+
+
+	mac->switchchannelHandler();
+}
+
+// CRAHNs Model END
+

@@ -307,6 +307,14 @@ OBJ_CC = \
 	wpan/p802_15_4nam.o wpan/p802_15_4phy.o \
 	wpan/p802_15_4sscs.o wpan/p802_15_4timer.o \
 	wpan/p802_15_4trace.o wpan/p802_15_4transac.o \
+	cognitive/SpectrumManager.o \
+	cognitive/SpectrumSensing.o \
+	cognitive/SpectrumDecision.o \
+	cognitive/SpectrumMobility.o \
+	cognitive/SpectrumTimer.o \
+	cognitive/PUmodel.o \
+	cognitive/repository.o \
+	cognitive/SpectrumData.o \
 	@V_STLOBJ@
 
 

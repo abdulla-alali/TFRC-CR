@@ -80,10 +80,14 @@
 inline void
 Mac802_11::checkBackoffTimer()
 {
-	if(is_idle() && mhBackoff_.paused())
+
+
+	if(is_idle() && mhBackoff_.paused() )
 		mhBackoff_.resume(phymib_.getDIFS());
-	if(! is_idle() && mhBackoff_.busy() && ! mhBackoff_.paused())
+	if(!is_idle() && mhBackoff_.busy() && ! mhBackoff_.paused())
 		mhBackoff_.pause();
+	
+	
 }
 
 inline void
@@ -117,10 +121,18 @@ Mac802_11::transmit(Packet *p, double timeout)
 	 *       Interface can distinguish between incoming and
 	 *       outgoing packets.
 	 */
+	
+	#ifdef MAC_VERBOSE
+	if (HDR_CMN(p)->ptype() != PT_MAC)
+		printf(" [SEND] Node %d transmits on the interface number: %d \n",index_/MAX_RADIO, index_%MAX_RADIO);
+	#endif
+
 	downtarget_->recv(p->copy(), this);	
 	mhSend_.start(timeout);
 	mhIF_.start(txtime(p));
 }
+
+
 inline void
 Mac802_11::setRxState(MacState newState)
 {
@@ -187,7 +199,7 @@ MAC_MIB::MAC_MIB(Mac802_11 *parent)
 Mac802_11::Mac802_11() : 
 	Mac(), phymib_(this), macmib_(this), mhIF_(this), mhNav_(this), 
 	mhRecv_(this), mhSend_(this), 
-	mhDefer_(this), mhBackoff_(this)
+	mhDefer_(this), mhBackoff_(this), mhQueue_(this), mhSwitch_(this)
 {
 	
 	nav_ = 0.0;
@@ -225,7 +237,25 @@ Mac802_11::Mac802_11() :
 
         EOTtarget_ = 0;
        	bss_id_ = IBSS_ID;
-	//printf("bssid in constructor %d\n",bss_id_);
+	
+
+	// CRAHNs Model START
+	// @author:  Marco Di Felice	
+	
+	// Initialize the parameters for the switching interface
+	switching_channel_=-1;
+	first_tx_attempt_=true;
+	channel_switching_=false;
+
+	// Initiliaze the switching policy for the queue management
+	switchable_policy_=ROUND_ROBIN_ACTIVE_CHANNELS;
+	
+	if (index_%MAX_RADIO == RECEIVER_RADIO)
+		sm_=new SpectrumManager(this,index_/MAX_RADIO,0.1,1.0);
+
+	// CRAHNs Model END
+
+
 }
 
 
@@ -248,7 +278,7 @@ Mac802_11::command(int argc, const char*const* argv)
 			return TCL_OK;
 		} else if(strcmp(argv[1], "nodes") == 0) {
 			if(cache_) return TCL_ERROR;
-			cache_node_count_ = atoi(argv[2]);
+			cache_node_count_ = atoi(argv[2]) * MAX_RADIO;
 			cache_ = new Host[cache_node_count_ + 1];
 			assert(cache_);
 			bzero(cache_, sizeof(Host) * (cache_node_count_+1 ));
@@ -257,10 +287,57 @@ Mac802_11::command(int argc, const char*const* argv)
 			// command added to support event tracing by Sushmita
                         et_ = (EventTrace *)TclObject::lookup(argv[2]);
                         return (TCL_OK);
-                }
+		
+
+		// CRAHNs Model START
+		// @author:  Marco Di Felice	
+	
+                } else if (strcmp(argv[1], "setRepository") == 0) {
+			
+			// Set the actual cross-layer repository
+			repository_ = (Repository*) TclObject::lookup(argv[2]);
+     		
+			if (index_%MAX_RADIO == RECEIVER_RADIO)  
+				sm_->setRepository(repository_);
+
+			return (TCL_OK);
+    		}
+		
+		else if (strcasecmp (argv[1], "set-pu-model") == 0) {
+			
+			//Setting the PUmodel for the CR	
+			if (index_%MAX_RADIO == RECEIVER_RADIO)  {
+				pumodel_ = (PUmodel *) TclObject::lookup(argv[2]);
+				sm_->setPUmodel(0.1, pumodel_);
+			 }
+
+			return TCL_OK;
+
+		} else if (strcasecmp (argv[1], "sensing-start") == 0) {
+
+			if (index_%MAX_RADIO == RECEIVER_RADIO)  
+				sm_->start();		
+	
+			return TCL_OK;
+
+		} else if (strcasecmp (argv[1], "set-spectrum-model") == 0) {
+	
+			//Setting the PUmodel for the CR	
+			if (index_%MAX_RADIO == RECEIVER_RADIO)  {
+				sd_ = (SpectrumData *) TclObject::lookup(argv[2]);
+				sm_->setSpectrumData(sd_);
+			 }
+
+			return TCL_OK;
+
+		} 
+		// CRAHNs Model END
+	
 	}
 	return Mac::command(argc, argv);
 }
+
+
 
 // Added by Sushmita to support event tracing
 void Mac802_11::trace_event(char *eventtype, Packet *p) 
@@ -405,6 +482,21 @@ Mac802_11::is_idle()
 	if(nav_ > Scheduler::instance().clock())
 		return 0;
 	
+	// CRAHNs Model START
+	// @author:  Marco Di Felice	
+
+	// Check if the CR is doing sensing OR is performing a spectrum handoff
+	if ((index_%MAX_RADIO == RECEIVER_RADIO) && (!sm_->is_channel_available()) )
+		return 0;	
+
+	// Check if the CR is switching channel on the TX interface
+	if ((index_%MAX_RADIO == TRANSMITTER_RADIO) && (channel_switching_))
+		return 0;	
+
+	// CRAHNs Model END
+	// @author:  Marco Di Felice	
+
+
 	return 1;
 }
 
@@ -560,7 +652,12 @@ Mac802_11::tx_resume()
 	} else if(callback_) {
 		Handler *h = callback_;
 		callback_ = 0;
-		h->handle((Event*) 0);
+		if (index_%MAX_RADIO == TRANSMITTER_RADIO) {
+			EventSwitch *p=new EventSwitch();
+			p->channel = new_switchable_channel_;
+			h->handle(p);
+		} else 
+			h->handle((Event*) 0);
 	}
 	setTxState(MAC_IDLE);
 }
@@ -842,6 +939,18 @@ Mac802_11::sendRTS(int dst)
 	ch->size() = phymib_.getRTSlen();
 	ch->iface() = -2;
 	ch->error() = 0;
+	
+
+	// CRAHNs Model START
+	// @author:  Marco Di Felice	
+
+	// Setting channel for the RTS to the fixed channel of the receiver
+	if (index_ % MAX_RADIO == CONTROL_RADIO) 
+		ch->channel_ = CONTROL_CHANNEL;
+	else
+		ch->channel_ = repository_->get_recv_channel(dst/MAX_RADIO);
+	
+	// CRAHNs Model END
 
 	bzero(rf, MAC_HDR_LEN);
 
@@ -887,6 +996,19 @@ Mac802_11::sendCTS(int dst, double rts_duration)
 	ch->uid() = 0;
 	ch->ptype() = PT_MAC;
 	ch->size() = phymib_.getCTSlen();
+	
+
+	// CRAHNs Model START
+	// @author:  Marco Di Felice	
+
+	// Setting channel for the CTS, based on the actual channel on which the rx interface is tuned
+	if (index_ % MAX_RADIO == CONTROL_RADIO) 
+		ch->channel_ = CONTROL_CHANNEL;
+	else
+		ch->channel_ = repository_->get_recv_channel(index_/MAX_RADIO);
+	
+	// CRAHNs Model END
+
 
 
 	ch->iface() = -2;
@@ -939,6 +1061,21 @@ Mac802_11::sendACK(int dst)
 	ch->iface() = -2;
 	ch->error() = 0;
 	
+
+
+	// CRAHNs Model START
+	// @author:  Marco Di Felice	
+
+	// Setting channel for the ACK, based on the channel on which the rx interface is tuned
+	if (index_ % MAX_RADIO == CONTROL_RADIO) 
+		ch->channel_ = CONTROL_CHANNEL;
+	else
+		ch->channel_ = repository_->get_recv_channel(index_/MAX_RADIO);
+
+	// CRAHNs Model END
+
+
+
 	bzero(af, MAC_HDR_LEN);
 
 	af->af_fc.fc_protocol_version = MAC_ProtocolVersion;
@@ -964,6 +1101,9 @@ Mac802_11::sendACK(int dst)
 	
 	pktCTRL_ = p;
 }
+
+
+
 
 void
 Mac802_11::sendDATA(Packet *p)
@@ -993,6 +1133,10 @@ Mac802_11::sendDATA(Packet *p)
 
 	/* store data tx time */
  	ch->txtime() = txtime(ch->size(), dataRate_);
+	
+	if (ch->ptype() != PT_AODV)
+		ch->channel_ = repository_->get_recv_channel(ETHER_ADDR(dh->dh_ra)/MAX_RADIO);
+
 
 	if((u_int32_t)ETHER_ADDR(dh->dh_ra) != MAC_BROADCAST) {
 		/* store data tx time for unicast packets */
@@ -1145,6 +1289,29 @@ Mac802_11::send(Packet *p, Handler *h)
 		em->set_node_state(EnergyModel::INROUTE);
 	}
 	
+	// CRAHNs Model START
+	// @author:  Marco Di Felice
+	
+	if (index_%MAX_RADIO == TRANSMITTER_RADIO) {
+		
+		switching_channel_ = repository_->get_recv_channel(ETHER_ADDR(dh->dh_ra)/MAX_RADIO);
+
+		if (first_tx_attempt_) {
+			new_switchable_channel_=switching_channel_;
+			mhQueue_.start(QUEUE_UTILIZATION_INTERVAL);
+			first_tx_attempt_=false;
+		 }
+
+
+		 callbackQueue_=h;
+	}
+
+
+	
+	// CRAHNs Model END
+
+	
+
 	callback_ = h;
 	sendDATA(p);
 	sendRTS(ETHER_ADDR(dh->dh_ra));
@@ -1202,6 +1369,79 @@ Mac802_11::recv(Packet *p, Handler *h)
                 send(p, h);
                 return;
         }
+
+	
+
+
+	// CRAHNs Model START
+	// @author:  Marco Di Felice
+		
+	// Channel Sensing: Discard a packet which is not received on the current channel
+	int current_channel;
+	
+	// Case 0: This is a control radio interfaces, tuned on the CONTROL CHANNEL
+	if (index_%MAX_RADIO == CONTROL_RADIO) 
+		current_channel=CONTROL_CHANNEL; 
+	
+
+	// Case 0: This is a transmitter radio interface
+	if (index_%MAX_RADIO == TRANSMITTER_RADIO) 
+		current_channel=switching_channel_; 
+		
+
+	// Case 1: This is a receiver radio interface, then channel information can be retrived by the lookup table
+	if (index_%MAX_RADIO == RECEIVER_RADIO)
+		current_channel=repository_->get_recv_channel(index_/MAX_RADIO);
+	
+	
+	// Discard the packet ef it is received on a channel on which my radio interface is not tuned
+	if  (hdr->channel_ != current_channel)  {
+
+		
+		Packet::free(p);
+		p=0;
+
+		return;
+	}
+	
+
+	// Both radio interfaces are tuned on the same channel. Use the receiver interface, discard the packet on the switching interface.
+/*	if  ( (index_%MAX_RADIO == TRANSMITTER_RADIO) && (switching_channel_ == repository_->get_recv_channel(index_/MAX_RADIO) ) )   {
+		
+		Packet::free(p);
+		p=0;
+
+		return;
+
+	}
+*/
+	
+	#ifdef MAC_VERBOSE
+	if (HDR_CMN(p)->ptype() != PT_MAC)
+		printf(" [RECV] Node %d receives on the interface number: %d  channel %d \n",index_/MAX_RADIO, index_%MAX_RADIO, current_channel);
+	#endif
+
+	
+	// Enable the modelling of Tx errors caused by (i) channel errors and/or (ii) PU interference
+	#ifdef PU_ERROR_MODEL
+	if (index_%MAX_RADIO == RECEIVER_RADIO) {
+
+		// Check if a TX channel error occurs
+		double randomValue=Random::uniform();
+		if (randomValue < per_)
+			hdr->error() = 1;
+
+		// Check if a PU is active while receiving the packet
+		if (sm_->is_PU_interfering(p))
+			hdr->error() = 1;		 	
+
+	}
+	#endif
+	
+ 	// CRAHNs Model END
+
+
+ 
 	/*
 	 *  Handle incoming packets.
 	 *
@@ -1287,14 +1527,24 @@ Mac802_11::recv_timer()
 		set_nav(usec(phymib_.getEIFS()));
 		goto done;
 	}
+	
+
+	// CRAHNs Model START
+	// @author:  Marco Di Felice
+	 
+	// Packet Filtering
+	if(dst  != (u_int32_t)(index_)) {
+
+		  set_nav(mh->dh_duration);
+   	}
+	
+	// CRAHNs Model END
 
 	/*
 	 * IEEE 802.11 specs, section 9.2.5.6
 	 *	- update the NAV (Network Allocation Vector)
 	 */
-	if(dst != (u_int32_t)index_) {
-		set_nav(mh->dh_duration);
-	}
+
 
         /* tap out - */
         if (tap_ && type == MAC_Type_Data &&
@@ -1312,10 +1562,16 @@ Mac802_11::recv_timer()
 		src = ETHER_ADDR(mh->dh_ta);
 		netif_->node()->energy_model()->add_neighbor(src);
 	}
+
+
 	/*
 	 * Address Filtering
+	 *
 	 */
-	if(dst != (u_int32_t)index_ && dst != MAC_BROADCAST) {
+
+
+	if((dst != (u_int32_t)(index_)) && dst != MAC_BROADCAST) {
+
 		/*
 		 *  We don't want to log this event, so we just free
 		 *  the packet instead of calling the drop routine.
@@ -1323,6 +1579,7 @@ Mac802_11::recv_timer()
 		discard(pktRx_, "---");
 		goto done;
 	}
+
 
 	switch(type) {
 
@@ -1613,3 +1870,151 @@ Mac802_11::recvACK(Packet *p)
 
 	mac_log(p);
 }
+
+
+
+
+
+
+/*++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ * CRAHNs MODEL MAC
+ * +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */ 	
+
+
+// CRAHNs Model START
+// @author:  Marco Di Felice	
+
+
+//switchqueueHandler: Handler for queue switching, based on the actual switchable_policy 
+void
+Mac802_11::switchqueueHandler()
+{
+	
+	bool end=false;
+	int prev_channel=new_switchable_channel_;
+	
+	switch(switchable_policy_)  {
+		
+		// ROUND_ROBIN_ALL_CHANNELS policy: Visit all the available channels sequentially
+		case ROUND_ROBIN_ALL_CHANNELS:
+
+			new_switchable_channel_=(new_switchable_channel_ + 1) % MAX_CHANNELS;
+			
+			// Data packets must not be sent on the CONTROL_CHANNEL
+			if (new_switchable_channel_ == CONTROL_CHANNEL)
+				new_switchable_channel_ = CONTROL_CHANNEL + 1;
+			break;
+		
+		// ROUND_ROBIN_ACTIVE_CHANNELS policy: Visit the ACTIVE channels sequentially 
+		case ROUND_ROBIN_ACTIVE_CHANNELS:
+			
+			// Look for the next channel on which the node is transmitting
+			for (int i=0; i< MAX_CHANNELS && !end; i++)  {	
+				
+				new_switchable_channel_=(new_switchable_channel_ + 1) % MAX_CHANNELS;
+				
+				if (new_switchable_channel_ == CONTROL_CHANNEL)
+					new_switchable_channel_ = CONTROL_CHANNEL + 1;
+				// If the channel is ACTIVE (i.e. the node is transmitting on that channel) then stop
+				if (repository_->is_channel_used_for_sending(index_/MAX_RADIO,new_switchable_channel_,Scheduler::instance().clock()))  
+					end=true;
+				 
+			 }
+				
+			 // No next channel was found. Keep transmitting on the current channel
+			 if (!end)
+				new_switchable_channel_=prev_channel;
+
+			 break;
+
+		// IMPLEMENT here your own policy scheme mamagement
+	 }
+	
+//	#ifdef MAC_VERBOSE
+		printf(" [SWITCHING INTERFACE] Node: %d Current channel: %d Time:%f \n",index_/MAX_RADIO,new_switchable_channel_, Scheduler::instance().clock());
+//	#endif
+
+	// Notify the IFQ layer that a queue switching has been performed
+	EventSwitch *p=new EventSwitch();
+	p->channel = new_switchable_channel_;
+	// If the node is not transmitting, then ask for another packet to the upper IFQ layer
+	if (callbackQueue_ && pktTx_==NULL) {
+		callbackQueue_->handle(p);
+	 }
+
+	
+	#ifdef CHANNEL_SWITCHING_MODEL
+	// The tx interface is performing channel switching
+	if (new_switchable_channel_ != prev_channel)  {
+		channel_switching_=true;
+		// Channel Switching Delay Timer
+		mhSwitch_.start(SWITCHING_DELAY);
+	 }
+	#endif
+
+	// Start the timer for Queue Switching
+	// QUEUE_UTILIZATION_INTERVAL defines how much time a node keeps transmitting on the actual switching_channel
+	// QUEUE_UTILIZATION_INTERVAL defined in mac/repository.h
+	mhQueue_.start(QUEUE_UTILIZATION_INTERVAL);	
+
+}
+
+
+
+
+//switchchannelHandler: Handler for SwitchChannelTimer
+void
+Mac802_11::switchchannelHandler()
+{
+	channel_switching_=false;
+	// Restart backoff timer
+	checkBackoffTimer();
+}
+
+
+
+
+// notifyUpperLayer: notify the NET layer about the presence of an active PU transmitter in the CR tx range
+void
+Mac802_11::notifyUpperLayer(int channel) {	
+	
+	// CR sends a notification to the upper layer  about the presence of a PU
+	Packet *p = Packet::alloc();
+	hdr_cmn* ch = HDR_CMN(p);
+	hdr_ip* ih = HDR_IP(p);
+
+	ch->ptype() = PT_NOTIFICATION;
+	ch->size() = IP_HDR_LEN;
+ 	ch->direction() = hdr_cmn::UP;
+	ch->iface() = -2;
+	ch->error() = 0;
+	ch->addr_type() = NS_AF_NONE;
+
+	// Used to inform the channel on which a PU has been detected
+	ch->channel_= channel;
+
+	// IP Header Routing Information
+	ih->sport() = RT_PORT;
+	ih->dport() = RT_PORT;
+	
+	uptarget_->recv(p, (Handler*) 0);
+
+}
+
+
+
+
+
+// load_spectrum: load the spectrum characteristics (bandwidth/PER/...)
+void 
+Mac802_11::load_spectrum(spectrum_entry_t spectrum) {
+	
+	dataRate_=spectrum.bandwidth;
+	per_=spectrum.per;
+}
+
+
+
+// CRAHNs Model END
+
+

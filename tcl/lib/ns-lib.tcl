@@ -348,7 +348,28 @@ Simulator instproc ifqType  {val} { $self set ifqType_  $val }
 Simulator instproc ifqLen  {val} { $self set ifqlen_  $val }
 Simulator instproc phyType  {val} { $self set phyType_  $val }
 Simulator instproc antType  {val} { $self set antType_  $val }
+
+#Modified by felicepizzi for LB-NET
 Simulator instproc channel {val} {$self set channel_ $val}
+Simulator instproc channel2 {val} {$self set channel2_ $val}
+Simulator instproc channel3 {val} {$self set channel3_ $val}
+Simulator instproc channel4 {val} {$self set channel4_ $val}
+Simulator instproc channel5 {val} {$self set channel5_ $val}
+Simulator instproc channel6 {val} {$self set channel6_ $val}
+Simulator instproc channel7 {val} {$self set channel7_ $val}
+Simulator instproc channel8 {val} {$self set channel8_ $val}
+Simulator instproc channel9 {val} {$self set channel9_ $val}
+Simulator instproc channel10 {val} {$self set channel10_ $val}
+Simulator instproc channel11 {val} {$self set channel11_ $val}
+
+
+
+
+
+
+
+
+
 Simulator instproc channelType {val} {$self set channelType_ $val}
 Simulator instproc topoInstance {val} {$self set topoInstance_ $val}
 Simulator instproc wiredRouting {val} {$self set wiredRouting_ $val}
@@ -444,7 +465,10 @@ Simulator instproc node-config args {
 
         $self instvar addressType_  routingAgent_ propType_  macTrace_ \
 	    routerTrace_ agentTrace_ movementTrace_ channelType_ channel_ \
-	    chan topoInstance_ propInstance_ mobileIP_ \
+	    #Modified by felicepizzi for LB-NET
+	    channel2_ channel3_ channel4_ channel5_ channel6_ channel7_ channel8_ channel9_ channel10_ channel11_ \
+	    chan chan2 chan3 chan4 chan5 chan6 chan7 chan8 chan9 chan10 chan11 \
+            topoInstance_ propInstance_ mobileIP_ \
 	    rxPower_ txPower_ idlePower_ sleepPower_ sleepTime_ transitionPower_ \
 	    transitionTime_ satNodeType_ eotTrace_
 
@@ -496,7 +520,41 @@ Simulator instproc node-config args {
  	} elseif {[info exists channel_]} {
 		# Multiple channel, multiple interfaces
 		set chan $channel_
+		
+		#Modified by felicepizzi for LB-NET
+		if {[info exists channel2_]} {
+   			set chan2 $channel2_
+	        }
+		if {[info exists channel3_]} {
+   			set chan3 $channel3_
+	        }	
+		if {[info exists channel4_]} {
+   			set chan4 $channel4_
+	        }
+		if {[info exists channel5_]} {
+   			set chan5 $channel5_
+	        }
+		if {[info exists channel6_]} {
+   			set chan6 $channel6_
+	        }
+		if {[info exists channel7_]} {
+   			set chan7 $channel7_
+	        }
+		if {[info exists channel8_]} {
+   			set chan8 $channel8_
+	        }	
+		if {[info exists channel9_]} {
+   			set chan9 $channel9_
+	        }
+		if {[info exists channel10_]} {
+   			set chan10 $channel10_
+	        }
+		if {[info exists channel11_]} {
+   			set chan11 $channel11_
+	        }
+
  	}
+
 	if [info exists topoInstance_] {
 		$propInstance_  topography $topoInstance_
 	}
@@ -591,7 +649,8 @@ Simulator instproc imep-support {} {
 # of standing here in ns-lib.tcl.
 Simulator instproc create-wireless-node args {
         $self instvar routingAgent_ wiredRouting_ propInstance_ llType_ \
-	    macType_ ifqType_ ifqlen_ phyType_ chan antType_ \
+	    #Modified by felicepizzi for LB-NET
+	    macType_ ifqType_ ifqlen_ phyType_ chan chan2 chan3 chan4 chan5 chan6 chan7 chan8 chan9  chan10 chan11 antType_ \
 	    energyModel_ initialEnergy_ txPower_ rxPower_ \
 	    idlePower_ sleepPower_ sleepTime_ transitionPower_ transitionTime_ \
 	    topoInstance_ level1_ level2_ inerrProc_ outerrProc_ FECProc_
@@ -615,6 +674,12 @@ Simulator instproc create-wireless-node args {
 	    AODV {
 		    set ragent [$self create-aodv-agent $node]
 	    }
+# Begin Marcello Caleffi, <marcello.caleffi@unina.it>, 08-02-06
+# AOMDV patch
+	    AOMDV {
+	            set ragent [$self create-aomdv-agent $node]
+	    }
+# End Marcello Caleffi, <marcello.caleffi@unina.it>, 08-02-06
 	    TORA {
 		    Simulator set IMEPFlag_ ON
 		    set ragent [$self create-tora-agent $node]
@@ -665,11 +730,54 @@ Simulator instproc create-wireless-node args {
 	}
 
 	
-
+	#puts "yes i'm here"
 	# Add main node interface
 	$node add-interface $chan $propInstance_ $llType_ $macType_ \
 	    $ifqType_ $ifqlen_ $phyType_ $antType_ $topoInstance_ \
 			$inerrProc_ $outerrProc_ $FECProc_
+
+	#Modified by felicepizzi for LB-NET
+	$node add-interface $chan $propInstance_ $llType_ $macType_ \
+	    $ifqType_ $ifqlen_ $phyType_ $antType_ $topoInstance_ \
+			$inerrProc_ $outerrProc_ $FECProc_
+
+	$node add-interface $chan $propInstance_ $llType_ $macType_ \
+	    $ifqType_ $ifqlen_ $phyType_ $antType_ $topoInstance_ \
+			$inerrProc_ $outerrProc_ $FECProc_
+
+#	$node add-interface $chan $propInstance_ $llType_ $macType_ \
+	    $ifqType_ $ifqlen_ $phyType_ $antType_ $topoInstance_ \
+			$inerrProc_ $outerrProc_ $FECProc_
+
+#	$node add-interface $chan $propInstance_ $llType_ $macType_ \
+	    $ifqType_ $ifqlen_ $phyType_ $antType_ $topoInstance_ \
+			$inerrProc_ $outerrProc_ $FECProc_
+
+#	$node add-interface $chan $propInstance_ $llType_ $macType_ \
+	    $ifqType_ $ifqlen_ $phyType_ $antType_ $topoInstance_ \
+			$inerrProc_ $outerrProc_ $FECProc_
+
+#	$node add-interface $chan $propInstance_ $llType_ $macType_ \
+	    $ifqType_ $ifqlen_ $phyType_ $antType_ $topoInstance_ \
+			$inerrProc_ $outerrProc_ $FECProc_
+
+#	$node add-interface $chan $propInstance_ $llType_ $macType_ \
+	    $ifqType_ $ifqlen_ $phyType_ $antType_ $topoInstance_ \
+			$inerrProc_ $outerrProc_ $FECProc_
+
+#	$node add-interface $chan $propInstance_ $llType_ $macType_ \
+	    $ifqType_ $ifqlen_ $phyType_ $antType_ $topoInstance_ \
+			$inerrProc_ $outerrProc_ $FECProc_
+
+#	$node add-interface $chan $propInstance_ $llType_ $macType_ \
+	    $ifqType_ $ifqlen_ $phyType_ $antType_ $topoInstance_ \
+			$inerrProc_ $outerrProc_ $FECProc_
+
+#	$node add-interface $chan $propInstance_ $llType_ $macType_ \
+	    $ifqType_ $ifqlen_ $phyType_ $antType_ $topoInstance_ \
+			$inerrProc_ $outerrProc_ $FECProc_
+
+
 	# Attach agent
 	if {$routingAgent_ != "DSR"} {
 		$node attach $ragent [Node set rtagent_port_]
@@ -833,6 +941,16 @@ Simulator instproc create-aodv-agent { node } {
         $node set ragent_ $ragent
         return $ragent
 }
+
+# Begin Marcello Caleffi, <marcello.caleffi@unina.it>, 08-02-06
+# AOMDV patch
+Simulator instproc create-aomdv-agent { node } {
+	set ragent [new Agent/AOMDV [$node node-addr]]
+	$self at 0.0 "$ragent start"
+	$node set ragent_ $ragent
+	return $ragent
+}
+# End Marcello Caleffi, <marcello.caleffi@unina.it>, 08-02-06
 
 Simulator instproc use-newtrace {} {
 	Simulator set WirelessNewTrace_ 1
@@ -2243,4 +2361,21 @@ Simulator instproc prepare-to-stop {} {
 		$i stop
 	}
 }
-    
+
+   
+Node/MobileNode instproc node-CR-configure { puMap rep sMap } {
+
+	$self instvar mac_ 
+        $self instvar ragent_
+
+	$mac_(2) set-pu-model $puMap
+	$mac_(2) set-spectrum-model $sMap
+     
+        $mac_(0) setRepository $rep
+        $mac_(1) setRepository $rep
+        $mac_(2) setRepository $rep
+	$ragent_ setRepository $rep
+ 
+  	$mac_(2) sensing-start 0
+
+}

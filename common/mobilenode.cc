@@ -222,6 +222,12 @@ MobileNode::command(int argc, const char*const* argv)
 				return TCL_ERROR;
 			phyp->insertnode(&ifhead_);
 			phyp->setnode(this);
+
+			//Phy* rifp = ifhead_.lh_first;
+ 			//for(; rifp; rifp = rifp->nextnode()){
+			//	printf("ci sono \n");
+			//}
+
 			return TCL_OK;
 		} else if (strcmp(argv[1], "setsleeptime") == 0) {
 			energy_model()->afe()->set_sleeptime(atof(argv[2]));
@@ -249,6 +255,7 @@ MobileNode::command(int argc, const char*const* argv)
 				return TCL_ERROR;
 			n->insertnode(&ifhead_);
 			n->setnode(this);
+			
 			return TCL_OK;
 		} else if(strcmp(argv[1], "topography") == 0) {
 			T_ = (Topography*) TclObject::lookup(argv[2]);
